@@ -4,11 +4,11 @@
 
 The default Blizzard loot display is bare-bones. You get a tiny popup, no price info, no way to tell what just dropped in your group, and zero customisation. Larlen Loot Frame replaces all of that with a proper loot feed you can actually make your own.
 
-Every item, gold pickup, currency, reputation gain, and honor reward flows into a clean scrolling feed with rarity-coloured bars, inline item levels, AH prices, and animated glow effects based on value. There is a completely separate feed for group loot so you can see what your party or raid is picking up without it cluttering your personal drops. See something you like or an upgrade someone else looted? Click the icon to ask for it in party, instance, or raid chat - or whisper them directly for that specific item. Add items to a wishlist so you never miss a target drop, blacklist junk you never want to see again, set up sound alerts for valuable loot, and filter by rarity, item type, or category.
+Larlen Loot Frame streams every item, currency, and reputation gain into a clean, scrolling feed enhanced by rarity bars, inline item levels, and AH prices. 
 
-Don't like a feature? Turn it off. Every single element is toggleable and adjustable through the options panel - the addon works the way you want it to. Want animated glows, sound alerts, and all the quality of life? Go ahead. Prefer a clean, minimal information feed with nothing extra? That works too. It is your loot frame, set it up however you like.
+A completely separate group feed lets you track party loot without cluttering your own drops, including quick-click buttons to whisper or ask for upgrades. You can easily wishlist target items, blacklist junk, and set custom sound or glow alerts for valuable loot. Every feature is fully toggleable through the options panel-whether you prefer a data-rich experience with animated glows or a minimalist feed with no extras, the addon is built to work exactly how you want it.
 
-It is also lightweight. No bundled textures or fonts, no bloat, no taint errors, no lag. Just install it and loot something.
+It is also lightweight. No bundled textures or fonts, no bloat, no taint errors, no lag. Just install and enjoyed massively improved looting!
 
 > **No hard dependencies.** Works out of the box with just the base game. Optionally reads AH prices from [Auctionator](https://www.curseforge.com/wow/addons/auctionator) or [TradeSkillMaster](https://www.curseforge.com/wow/addons/tradeskill-master) if installed - otherwise shows vendor prices only.
 
