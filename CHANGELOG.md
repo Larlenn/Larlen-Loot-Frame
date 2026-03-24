@@ -1,5 +1,9 @@
 # Larlen Loot Frame Changelog
 
+## v1.0.3
+- Fixed wishlist sound section being clickable when wishlist filter is disabled
+- Fixed error spam from C_HousingCatalog API change requiring a second argument
+
 ## v1.0.2
 - Added separate wishlist filters for currency and mounts/pets
 - Added ESC key support to close options window

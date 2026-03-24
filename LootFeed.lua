@@ -466,7 +466,6 @@ local function ApplyRowGlow(f, entry)
     local barTarget  = f
     local iconTarget = f._iconFrame
 
-    -- Value-based glow
     if not db.glowEnabled then
         StopTrackedGlow(f, "_v")
         barTarget:SetBackdropBorderColor(0, 0, 0, 0)
@@ -518,7 +517,6 @@ local function ApplyRowGlow(f, entry)
         end
     end
 
-    -- Wishlist glow
     if db.wishlistGlowEnabled and entry.link and LLF.Config:IsItemWishlisted(entry.link) then
         local wc = db.wishlistGlowColor or _wlColor
         _wlColor[1] = wc[1]; _wlColor[2] = wc[2]; _wlColor[3] = wc[3]; _wlColor[4] = wc[4] or 1
@@ -745,7 +743,7 @@ local function PopulateRow(f, entry)
             and entry.link
             and rar >= minRar
             and tradeable
-            and not entry.playerName  -- not a party loot row
+            and not entry.playerName
         if shouldOffer then
             oBtn._offerLink = entry.link
             oBtn:SetSize(16, 13)
@@ -764,7 +762,7 @@ local function PopulateRow(f, entry)
 end
 
 local rows      = {}
-Feed._rows = rows  -- expose for Options unlock reset
+Feed._rows = rows
 local feedFrame = nil
 
 local function ResizeFeedFrame()

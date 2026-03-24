@@ -101,7 +101,6 @@ function Price:GetAHValue(link)
     end
 end
 
--- Debug helper used by /llf testah
 function Price:DebugAH(link)
     local db = LLF.db
     local p = "|cff32bff7LLF AH Debug:|r "

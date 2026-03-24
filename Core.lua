@@ -136,7 +136,7 @@ local function GetItemCategory(link, classID, subClassID)
     if classID == 15 and subClassID == 2 then return "pet" end
     if C_HousingCatalog and C_HousingCatalog.GetCatalogEntryInfoByItem then
         local itemID = tonumber(link:match("item:(%d+)"))
-        if itemID and C_HousingCatalog.GetCatalogEntryInfoByItem(itemID) then return "housing" end
+        if itemID and C_HousingCatalog.GetCatalogEntryInfoByItem(itemID, false) then return "housing" end
     end
     return nil
 end
@@ -428,8 +428,6 @@ local function HandleQuestLoot(_, itemID, count)
     if entry then entry.rarity = 7; LLF.Feed:AddEntry(entry) end
 end
 
--- Loot suppression
-
 local lootSuppressHooked    = false
 local lootFrameHooksSetup   = false
 
@@ -463,7 +461,6 @@ local function SetupLootSuppression()
     f:RegisterEvent("LOOT_READY")
     f:RegisterEvent("ENCOUNTER_LOOT_RECEIVED")
     f:RegisterEvent("QUEST_LOOT_RECEIVED")
-    -- SHOW_LOOT_TOAST fires in Midnight for the AlertFrame "You received" toast
     f:RegisterEvent("SHOW_LOOT_TOAST")
     f:SetScript("OnEvent", function()
         if LLF.db and LLF.db.suppressDefaultLoot then

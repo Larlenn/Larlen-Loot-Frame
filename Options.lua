@@ -475,6 +475,7 @@ local function MakeListPicker(parent, label, h, getVal, setVal, itemsFn)
     Refresh()
     cont._refresh = Refresh
     cont._list    = list
+    cont._btn     = btn
     allPickers[#allPickers + 1] = cont
     return cont
 end
@@ -1045,7 +1046,6 @@ local function PageDurations(parent, CW)
         { 6, "|cffe6cc80Currency|r" },            { 7, "|cff00ccffQuest / Heirloom|r" },
     }
 
-    -- Personal Loot Durations
     p.Header("Personal Loot - Display Duration")
     for i = 1, #RAR, 2 do
         local L, R = RAR[i], RAR[i + 1]
@@ -1073,7 +1073,6 @@ local function PageDurations(parent, CW)
 
     p.Sep(12)
 
-    -- Group Loot Durations
     p.Header("Group Loot - Display Duration")
     for i = 1, #RAR, 2 do
         local L, R = RAR[i], RAR[i + 1]
@@ -1414,7 +1413,6 @@ local function PageFilters(parent, CW)
         { 6, "|cffe6cc80Currency|r" },            { 7, "|cff00ccffQuest / Heirloom|r" },
     }
 
-    -- ── Personal Loot Filters ──
     p.Header("|cff55ff55Personal Loot|r - Rarity")
     for i = 1, #RFILT, 2 do
         local L, R = RFILT[i], RFILT[i + 1]
@@ -1463,7 +1461,6 @@ local function PageFilters(parent, CW)
 
     p.Sep(20)
 
-    -- ── Group Loot Filters ──
     p.Header("|cff55bbffGroup Loot|r - Rarity")
     for i = 1, #RFILT, 2 do
         local L, R = RFILT[i], RFILT[i + 1]
@@ -1831,11 +1828,26 @@ local function PageAudio(parent, CW)
         local on = LLF.db.wishlistSoundEnabled
         lp2:SetAlpha(on and 1 or 0.35)
         lp2:EnableMouse(on)
+        if lp2._btn then lp2._btn:EnableMouse(on) end
         playBtn2:SetAlpha(on and 1 or 0.35)
         playBtn2:EnableMouse(on)
     end
     SyncWlSound()
     hooksecurefunc(wlSndToggle, "Sync", SyncWlSound)
+
+    local function SyncWlSndSection()
+        local wlOn = LLF.db.wishlistEnabled
+        wlSndToggle:EnableMouse(wlOn)
+        wlSndToggle:SetAlpha(wlOn and 1 or 0.35)
+        if not wlOn then
+            lp2:SetAlpha(0.35); lp2:EnableMouse(false)
+            if lp2._btn then lp2._btn:EnableMouse(false) end
+            playBtn2:SetAlpha(0.35); playBtn2:EnableMouse(false)
+        end
+    end
+    SyncWlSndSection()
+    hooksecurefunc(wlSndToggle, "Sync", SyncWlSndSection)
+    allToggles[#allToggles + 1] = wlSndToggle
 
     p.Finalize()
 end
@@ -2190,7 +2202,6 @@ local function PageBlacklist(parent, CW)
         RefreshAll()
     end
 
-    -- Add editbox
     addEB:SetScript("OnTextChanged", function(self, userInput)
         if not userInput then return end
         local t = self:GetText()
@@ -2220,7 +2231,6 @@ local function PageBlacklist(parent, CW)
 
     addBtn:SetScript("OnClick", CommitAdd)
 
-    -- Preview click
     prevCont:SetScript("OnClick", function() if pendingID then CommitAdd() end end)
     prevCont:SetScript("OnEnter", function()
         if pendingID then
@@ -2239,7 +2249,6 @@ local function PageBlacklist(parent, CW)
         end
     end)
 
-    -- Search editbox
     searchEB:SetScript("OnTextChanged", function(self, userInput)
         if not userInput then return end
         local t = self:GetText()
@@ -2774,7 +2783,6 @@ local function PageProfiles(parent, CW)
     end
     UpdateProfileDisplay()
 
-    -- Switch profile dropdown
     local switchY = p.GetY()
     local switchLP = MakeListPicker(parent, "Switch profile:", 40,
         function()
@@ -2809,10 +2817,8 @@ local function PageProfiles(parent, CW)
 
     p.Sep(4)
 
-    -- New / Copy / Delete buttons row
     local btnY = p.GetY()
 
-    -- New profile input + button
     local newCont = CreateFrame("Frame", N("PR_NC"), parent, "BackdropTemplate")
     newCont:SetHeight(ROW_H)
     newCont:SetPoint("TOPLEFT", parent, p.PAD, btnY)
@@ -3068,11 +3074,9 @@ local function PageProfiles(parent, CW)
 
     local function Import(encoded)
         local function ParseValue(s, pos)
-            -- skip whitespace
             while pos <= #s and s:sub(pos,pos):match("%s") do pos = pos + 1 end
             local c = s:sub(pos, pos)
             if c == "{" then
-                -- table
                 local t = {}; pos = pos + 1
                 while true do
                     while pos <= #s and s:sub(pos,pos):match("[%s,]") do pos = pos + 1 end
@@ -3082,11 +3086,10 @@ local function PageProfiles(parent, CW)
                                                 local numStr = s:match("^%[([%d%.%-]+)%]", pos)
                         if numStr then
                             key = tonumber(numStr)
-                            pos = pos + #numStr + 2 -- skip [N]
+                            pos = pos + #numStr + 2
                             while pos <= #s and s:sub(pos,pos):match("[%s=]") do pos = pos + 1 end
                         end
                     else
-                        -- string key
                         local k = s:match("^([%w_]+)%s*=", pos)
                         if k then key = k; pos = pos + #k; while pos <= #s and s:sub(pos,pos):match("[%s=]") do pos = pos + 1 end end
                     end
@@ -3117,7 +3120,6 @@ local function PageProfiles(parent, CW)
                 end
                 return table.concat(result), pos
             elseif s:sub(pos):match("^%-?[%d%.]+") then
-                -- number
                 local numStr = s:match("^%-?[%d%.]+", pos)
                 return tonumber(numStr), pos + #numStr
             elseif s:sub(pos):match("^true") then
@@ -3333,7 +3335,6 @@ local function BuildFloatWindow()
         if activePickerList then activePickerList:Hide(); activePickerList = nil end
     end)
 
-    -- Header bar
     local headerBar = floatWin:CreateTexture(nil, "BACKGROUND")
     headerBar:SetHeight(52)
     headerBar:SetPoint("TOPLEFT",  floatWin, "TOPLEFT",  1, -1)
@@ -3356,7 +3357,6 @@ local function BuildFloatWindow()
     headerLine:SetPoint("TOPRIGHT", floatWin, "TOPRIGHT", -1, -53)
     headerLine:SetColorTexture(ACCENT[1], ACCENT[2], ACCENT[3], 0.40)
 
-    -- Close button
     local closeBtn = CreateFrame("Button", nil, floatWin, "BackdropTemplate")
     closeBtn:SetSize(24, 24)
     closeBtn:SetPoint("TOPRIGHT", floatWin, "TOPRIGHT", -10, -14)
@@ -3377,7 +3377,6 @@ local function BuildFloatWindow()
         xFS:SetTextColor(GREY[1], GREY[2], GREY[3], 1)
     end)
 
-    -- Sidebar
     local sidebar = CreateFrame("Frame", nil, floatWin)
     sidebar:SetPoint("TOPLEFT",    floatWin, "TOPLEFT",    1, -54)
     sidebar:SetPoint("BOTTOMLEFT", floatWin, "BOTTOMLEFT", 1,   1)
@@ -3393,7 +3392,6 @@ local function BuildFloatWindow()
     sideDiv:SetPoint("BOTTOMLEFT", sidebar, "BOTTOMRIGHT", 0, 0)
     sideDiv:SetColorTexture(ACCENT[1], ACCENT[2], ACCENT[3], 0.18)
 
-    -- Content scroll
     local sf = CreateFrame("ScrollFrame", N("SF"), floatWin, "UIPanelScrollFrameTemplate")
     sf:SetPoint("TOPLEFT",     sideDiv,  "TOPRIGHT",    6,    0)
     sf:SetPoint("BOTTOMRIGHT", floatWin, "BOTTOMRIGHT", -22, 42)
@@ -3403,7 +3401,6 @@ local function BuildFloatWindow()
     contentHost:SetWidth(CONTENT_W)
     sf:SetScrollChild(contentHost)
 
-    -- Pages
     local PAGES = {
         { id="general",      label="General",        fn=PageGeneral        },
         { id="layout",       label="Personal Loot",  fn=PageLayout         },
@@ -3556,7 +3553,6 @@ local function BuildFloatWindow()
         wlClearAllBtn:SetShown(id == "wishlist")
     end
 
-    -- Nav buttons
     local NAV_H = 36
     for i, pg in ipairs(PAGES) do
         local btn = CreateFrame("Button", N("NB"), sidebar)
@@ -3604,7 +3600,6 @@ local function BuildFloatWindow()
         navButtons[i] = btn
     end
 
-    -- Resize grip
     local grip = CreateFrame("Button", nil, floatWin)
     grip:SetSize(18, 18)
     grip:SetPoint("BOTTOMRIGHT", floatWin, "BOTTOMRIGHT", -4, 4)
