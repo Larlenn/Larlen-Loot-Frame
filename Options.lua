@@ -1369,8 +1369,7 @@ local function PagePrice(parent, CW)
     ApplyGlowGating = function()
         local on = LLF.db.glowEnabled == true
         local gt = LLF.db.glowType or 1
-        -- Pixel=1: lines,speed,thickness   AutoCast=2: lines,speed,thickness(scale)   Blizzard=3: speed only
-        local linesOK = on and (gt ~= 3)
+                local linesOK = on and (gt ~= 3)
         local speedOK = on
         local thickOK = on and (gt ~= 3)
         for _, ctrl in ipairs(glowGatedControls) do

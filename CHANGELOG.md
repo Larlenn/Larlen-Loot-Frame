@@ -1,5 +1,9 @@
 # Larlen Loot Frame Changelog
 
+## v1.0.1
+- Fixed icon border layering - borders now render above the icon
+- Fixed mount/pet border colors to show actual rarity instead of fixed category colors
+
 ## v1.0.0
 - Initial release.
 - Loot feed overlay for items, gold, currencies, and reputation gains.

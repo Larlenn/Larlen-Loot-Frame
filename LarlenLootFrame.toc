@@ -2,7 +2,7 @@
 ## Title: Larlen Loot Frame
 ## Notes: Clean, lightweight loot feed inspired by the "Loot Frame" WeakAura. Supports Auctionator & TSM pricing. No bloat.
 ## Author: Larlen
-## Version: 1.0.0
+## Version: 1.0.1
 ## X-Curse-Project-ID: 1494468
 ## X-Wago-ID: 96ELZ2Ng
 ## SavedVariables: LarlenLootFrameDB

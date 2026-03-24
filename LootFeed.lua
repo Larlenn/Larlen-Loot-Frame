@@ -217,7 +217,7 @@ local function AcquireRow(parent)
     f._icon = icon
 
     local function MakeEdgeLine()
-        local t = f:CreateTexture(nil, "OVERLAY")
+        local t = iconFrame:CreateTexture(nil, "OVERLAY")
         t:SetColorTexture(1, 1, 1, 1)
         t:SetSize(1, 1)
         return t
@@ -636,8 +636,7 @@ local function PopulateRow(f, entry)
         end
     end
 
-    local rc = (entry.itemCategory and CATEGORY_COLOR[entry.itemCategory])
-            or RARITY_COLOR[entry.rarity or 1] or DEFAULT_COLOR
+    local rc = RARITY_COLOR[entry.rarity or 1] or DEFAULT_COLOR
 
     if db.showRarityBar ~= false then
         f._edge:SetColorTexture(rc[1], rc[2], rc[3], 0.85)
@@ -1461,6 +1460,8 @@ function PFeed:Preview()
           link="item:32768" },
         { icon=656558,  name="Disgusting Oozeling",          rarity=3, source=4, count=1,  isGear=false, price=0,      subType="Pet",              playerName="Cinderfall", mergeKey="ppv7", isPreview=true, itemCategory="pet",
           link="item:20769" },
+        { icon=136243,  name="Test Whisper Item",            rarity=4, source=3, ilvl=398, isGear=true,  price=50000,  subType="Two-Handed Sword", playerName=UnitName("player"), playerNameFull=UnitName("player"), mergeKey="ppvWHISPER_SELF_TEST", isPreview=true, upgradeTrackTier=4,
+          link="item:19364" },
     }
     local ids = {}
     for _, item in ipairs(samples) do
