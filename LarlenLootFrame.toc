@@ -1,0 +1,40 @@
+## Interface: 120001
+## Title: Larlen Loot Frame
+## Notes: Clean, lightweight loot feed inspired by the "Loot Frame" WeakAura. Supports Auctionator & TSM pricing. No bloat.
+## Author: Larlen
+## Version: 1.0.0
+## X-Curse-Project-ID: 1494468
+## X-Wago-ID:
+## SavedVariables: LarlenLootFrameDB
+## IconTexture: 136240
+## OptionalDeps: Auctionator, TradeSkillMaster
+## X-Compartment: LarlenLootFrame_OnCompartmentClick
+## X-Compartment-Icon: 136240
+## X-Compartment-HoverText: Larlen Loot Frame
+## Category-enUS: Inventory
+## Category-deDE: Inventar
+## Category-esES: Inventario
+## Category-esMX: Inventario
+## Category-frFR: Inventaire
+## Category-itIT: Inventario
+## Category-koKR: 소지품
+## Category-ptBR: Inventário
+## Category-ruRU: Предметы
+## Category-zhCN: 物品栏
+## Category-zhTW: 物品欄
+
+Libs\LibStub\LibStub.lua
+Libs\CallbackHandler-1.0\CallbackHandler-1.0.lua
+Libs\LibDataBroker-1.1\LibDataBroker-1.1.lua
+Libs\LibDBIcon-1.0\LibDBIcon-1.0.lua
+Libs\LibSharedMedia-3.0\LibSharedMedia-3.0.lua
+Libs\LibCustomGlow-1.0.lua
+Libs\LibDeflate.lua
+
+Bootstrap.lua
+Config.lua
+PriceHelper.lua
+LootFeed.lua
+Options.lua
+MinimapButton.lua
+Core.lua
