@@ -46,6 +46,8 @@ local function RefreshAll()
     for _, t in ipairs(allToggles) do if t.Sync   then t:Sync()     end end
     for _, s in ipairs(allSliders) do if s._refresh then s._refresh() end end
     for _, p in ipairs(allPickers) do if p._refresh then p._refresh() end end
+    if LLF.Feed and LLF.Feed.RefreshTestRows then LLF.Feed:RefreshTestRows() end
+    if LLF.PartyFeed and LLF.PartyFeed.RefreshTestRows then LLF.PartyFeed:RefreshTestRows() end
     isRefreshing = false
 end
 Opt.RefreshAll = RefreshAll
@@ -2079,6 +2081,7 @@ local function PageBlacklist(parent, CW)
             r._removeBtn:SetScript("OnClick", function()
                 gdb.blacklist[capturedID] = nil
                 RebuildBlacklist()
+                RefreshAll()
             end)
 
             y = y - ITEM_ROW
@@ -2184,6 +2187,7 @@ local function PageBlacklist(parent, CW)
         searchEB:SetText("")
         searchPlaceholder:Show()
         RebuildBlacklist()
+        RefreshAll()
     end
 
     -- Add editbox
@@ -2263,7 +2267,7 @@ end
 local function PageWishlist(parent, CW)
     local p = MakePage(parent, CW)
     p.Header("Item Wishlist")
-    p.Label("|cffaaaaaaOnly wishlisted items appear in your feed. Gold, currency, rep, and honor are unaffected.|r")
+    p.Label("|cffaaaaaaOnly wishlisted items appear in your feed. Gold, currency, rep, and honor are unaffected unless toggled below.|r")
     p.Sep(6)
 
     local wlToggle = p.RowL("Enable wishlist filter",
@@ -2271,13 +2275,23 @@ local function PageWishlist(parent, CW)
         function(v) LLF.db.wishlistEnabled = v; RefreshAll() end)
     local grpToggle = p.RowR("Also apply to group loot",
         function() return LLF.db.wishlistGroupLoot == true end,
-        function(v) LLF.db.wishlistGroupLoot = v end)
+        function(v) LLF.db.wishlistGroupLoot = v; RefreshAll() end)
+    local currencyToggle = p.RowL("Filter gold/currency/rep/honor",
+        function() return LLF.db.wishlistFilterCurrency == true end,
+        function(v) LLF.db.wishlistFilterCurrency = v; RefreshAll() end)
+    local mountsPetsToggle = p.RowR("Filter mounts/pets",
+        function() return LLF.db.wishlistFilterMountsPets == true end,
+        function(v) LLF.db.wishlistFilterMountsPets = v; RefreshAll() end)
+    allToggles[#allToggles + 1] = currencyToggle
+    allToggles[#allToggles + 1] = mountsPetsToggle
 
     local listCont  -- forward declare so SyncGroupToggle can access it
     local function SyncGroupToggle()
         local enabled = LLF.db.wishlistEnabled
         grpToggle:EnableMouse(enabled)
         grpToggle:SetAlpha(enabled and 1 or 0.35)
+        if currencyToggle then currencyToggle:EnableMouse(enabled); currencyToggle:SetAlpha(enabled and 1 or 0.35) end
+        if mountsPetsToggle then mountsPetsToggle:EnableMouse(enabled); mountsPetsToggle:SetAlpha(enabled and 1 or 0.35) end
         if listCont then listCont:SetAlpha(enabled and 1 or 0.35) end
     end
     SyncGroupToggle()
@@ -2500,6 +2514,7 @@ local function PageWishlist(parent, CW)
             r._removeBtn:SetScript("OnClick", function()
                 gdb.wishlist[capturedID] = nil
                 RebuildWishlist()
+                RefreshAll()
             end)
 
             y = y - ITEM_ROW
@@ -3064,8 +3079,7 @@ local function PageProfiles(parent, CW)
                     if s:sub(pos,pos) == "}" then pos = pos + 1; break end
                     local key, val
                     if s:sub(pos,pos) == "[" then
-                        -- numeric key [N]=
-                        local numStr = s:match("^%[([%d%.%-]+)%]", pos)
+                                                local numStr = s:match("^%[([%d%.%-]+)%]", pos)
                         if numStr then
                             key = tonumber(numStr)
                             pos = pos + #numStr + 2 -- skip [N]
@@ -3082,8 +3096,7 @@ local function PageProfiles(parent, CW)
                 end
                 return t, pos
             elseif c == '"' then
-                -- quoted string (handles \" and \\ escapes)
-                local result = {}; pos = pos + 1
+                                local result = {}; pos = pos + 1
                 while pos <= #s do
                     local ch = s:sub(pos, pos)
                     if ch == "\\" then
@@ -3516,6 +3529,7 @@ local function BuildFloatWindow()
             wipe(LLF.db.blacklist)
             
             if LLF.Options._blRebuild then LLF.Options._blRebuild() end
+            RefreshAll()
         end
     end)
     blClearAllBtn:Hide()
@@ -3527,6 +3541,7 @@ local function BuildFloatWindow()
             wipe(LLF.db.wishlist)
             
             if LLF.Options._wlRebuild then LLF.Options._wlRebuild() end
+            RefreshAll()
         end
     end)
     wlClearAllBtn:Hide()
@@ -3610,6 +3625,12 @@ local function BuildFloatWindow()
     floatWin:HookScript("OnShow", function()
         ShowPage(currentPage or "general")
     end)
+    floatWin:SetScript("OnKeyDown", function(self, key)
+        if key == "ESCAPE" then
+            self:Hide()
+        end
+    end)
+    floatWin:EnableKeyboard(true)
 end
 
 

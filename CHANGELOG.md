@@ -1,5 +1,10 @@
 # Larlen Loot Frame Changelog
 
+## v1.0.2
+- Added separate wishlist filters for currency and mounts/pets
+- Added ESC key support to close options window
+- Fixed wishlist/blacklist filtering to apply to test rows live
+
 ## v1.0.1
 - Fixed icon border layering - borders now render above the icon
 - Fixed mount/pet border colors to show actual rarity instead of fixed category colors

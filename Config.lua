@@ -84,6 +84,9 @@ Config.DEFAULTS = {
     wishlist    = {},
     wishlistEnabled   = false,
     wishlistGroupLoot = false,
+    wishlistFilterNonGear = false,
+    wishlistFilterCurrency = false,
+    wishlistFilterMountsPets = false,
     showMinimap = true,
     minimapIcon = {},
 

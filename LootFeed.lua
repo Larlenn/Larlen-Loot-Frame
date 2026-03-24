@@ -909,8 +909,16 @@ function Feed:AddEntry(entry)
     local pf = db.personalFilters
     if pf and pf.filterRarity and pf.filterRarity[rar] == false then return end
 
-    if not entry.isPreview and db.wishlistEnabled and entry.link then
-        if not LLF.Config:IsItemWishlisted(entry.link) then return end
+    if db.wishlistEnabled then
+        if entry.link then
+            if entry.isGear then
+                if not LLF.Config:IsItemWishlisted(entry.link) then return end
+            elseif entry.itemCategory == "pet" or entry.itemCategory == "mount" then
+                if db.wishlistFilterMountsPets and not LLF.Config:IsItemWishlisted(entry.link) then return end
+            end
+        elseif not entry.link and db.wishlistFilterCurrency then
+            return
+        end
     end
 
     local dur = (entry.source == 1) and LLF.Config:GetDuration("gold") or LLF.Config:GetDuration(rar)
@@ -1018,8 +1026,16 @@ function Feed:OnUpdate(_elapsed)
             if not filtered and db.blacklistEnabled and r.entry.link then
                 if LLF.Config:IsItemBlacklisted(r.entry.link) then filtered = true end
             end
-            if not filtered and db.wishlistEnabled and r.entry.link then
-                if not LLF.Config:IsItemWishlisted(r.entry.link) then filtered = true end
+            if not filtered and db.wishlistEnabled then
+                if r.entry.link then
+                    if r.entry.isGear then
+                        if not LLF.Config:IsItemWishlisted(r.entry.link) then filtered = true end
+                    elseif r.entry.itemCategory == "pet" or r.entry.itemCategory == "mount" then
+                        if db.wishlistFilterMountsPets and not LLF.Config:IsItemWishlisted(r.entry.link) then filtered = true end
+                    end
+                elseif not r.entry.link and db.wishlistFilterCurrency then
+                    filtered = true
+                end
             end
             if filtered then
                 if r.rowFrame:IsShown() then r.rowFrame:Hide(); dirty = true end
@@ -1285,8 +1301,16 @@ function PFeed:AddEntry(entry)
     if gf and gf.filterRarity and gf.filterRarity[rar] == false then return end
     if rar < (pdf.filterMinRarity or 0) then return end
 
-    if not entry.isPreview and db.wishlistEnabled and db.wishlistGroupLoot and entry.link then
-        if not LLF.Config:IsItemWishlisted(entry.link) then return end
+    if db.wishlistEnabled and db.wishlistGroupLoot then
+        if entry.link then
+            if entry.isGear then
+                if not LLF.Config:IsItemWishlisted(entry.link) then return end
+            elseif entry.itemCategory == "pet" or entry.itemCategory == "mount" then
+                if db.wishlistFilterMountsPets and not LLF.Config:IsItemWishlisted(entry.link) then return end
+            end
+        elseif not entry.link and db.wishlistFilterCurrency then
+            return
+        end
     end
 
     local dur = LLF.Config:GetDuration(rar, "group")
@@ -1363,8 +1387,16 @@ function PFeed:OnUpdate(_elapsed)
             if not filtered and db.blacklistEnabled and r.entry.link then
                 if LLF.Config:IsItemBlacklisted(r.entry.link) then filtered = true end
             end
-            if not filtered and db.wishlistEnabled and db.wishlistGroupLoot and r.entry.link then
-                if not LLF.Config:IsItemWishlisted(r.entry.link) then filtered = true end
+            if not filtered and db.wishlistEnabled and db.wishlistGroupLoot then
+                if r.entry.link then
+                    if r.entry.isGear then
+                        if not LLF.Config:IsItemWishlisted(r.entry.link) then filtered = true end
+                    elseif r.entry.itemCategory == "pet" or r.entry.itemCategory == "mount" then
+                        if db.wishlistFilterMountsPets and not LLF.Config:IsItemWishlisted(r.entry.link) then filtered = true end
+                    end
+                elseif not r.entry.link and db.wishlistFilterCurrency then
+                    filtered = true
+                end
             end
             if filtered then
                 if r.rowFrame:IsShown() then r.rowFrame:Hide(); dirty = true end
