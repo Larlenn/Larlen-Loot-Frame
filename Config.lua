@@ -16,11 +16,11 @@ Config.DEFAULTS = {
     feedBgAlpha      = 0.75,
     rowBgAlpha       = 0.80,
     feedLocked       = false,
-    feedFont         = "",      -- empty = auto from LSM
+    feedFont         = "",
     durations = {
         [0] = 3,  [1] = 5,  [2] = 5,  [3] = 7,
         [4] = 10, [5] = 15, [6] = 5,  [7] = 7,
-        [8] = 5,  -- Honor
+        [8] = 5,
         gold = 5,
         rep  = 5,
     },
@@ -54,6 +54,10 @@ Config.DEFAULTS = {
     showUpgradeTrack     = true,
     showCraftingQuality  = true,
     iconBorderThickness = 2,
+    rowBgTexture   = "",
+    rowBorderStyle = "None",
+    rowBorderSize  = 1,
+    rowBorderColor = { 1, 1, 1, 1 },
     showRep          = true,
     showInvCount     = false,
     needMessage      = "{name}, do you need {item}?",
@@ -106,8 +110,8 @@ Config.DEFAULTS = {
     wishlistGlowColor   = { 1, 0.84, 0, 1 },
 
     soundEnabled   = false,
-    soundThreshold = 200,   -- gold
-    soundChoice    = 1,     -- index into LLF.SOUNDS
+    soundThreshold = 200,
+    soundChoice    = 1,
     wishlistSoundEnabled = false,
     wishlistSoundChoice  = 1,
 
@@ -328,7 +332,6 @@ function Config:RenameProfile(oldName, newName)
     return true
 end
 
--- blacklist[itemID] = { name, icon, rarity, link }
 function Config:InitBlacklist()
     local bl = LLF.db.blacklist
     if type(bl) == "table" then

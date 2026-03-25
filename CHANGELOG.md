@@ -1,5 +1,8 @@
 # Larlen Loot Frame Changelog
 
+## v1.0.5
+- Added customisable row border - pick any LibSharedMedia border texture, size, and color
+
 ## v1.0.4
 - Fixed crafting/gathering quality icon display on loot rows
 - Added upgrade track tier display (Explorer/Adventurer/Veteran/Champion/Hero/Myth) on gear rows with toggle

@@ -491,8 +491,6 @@ local function HandleQuestLoot(_, itemID, count)
     if entry then entry.rarity = 7; LLF.Feed:AddEntry(entry) end
 end
 
--- Loot suppression
-
 local lootSuppressHooked      = false
 local lootFrameHooksSetup     = false
 local transmogSuppressHooked  = false

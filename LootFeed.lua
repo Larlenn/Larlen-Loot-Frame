@@ -5,12 +5,95 @@ local Feed = LLF.Feed
 LLF.PartyFeed = {}
 local PFeed = LLF.PartyFeed
 
+local WHITE_TEX = "Interface\\Buttons\\WHITE8x8"
+
 local FEED_BACKDROP = {
-    bgFile   = "Interface\\Buttons\\WHITE8x8",
-    edgeFile = "Interface\\Buttons\\WHITE8x8",
+    bgFile   = WHITE_TEX,
+    edgeFile = WHITE_TEX,
     tileEdge = false, edgeSize = 1,
     insets   = { left = 0, right = 0, top = 0, bottom = 0 },
 }
+
+local function GetBorderFile(style)
+    if not style or style == "None" or style == "" then return nil end
+    local lsm = LibStub and LibStub("LibSharedMedia-3.0", true)
+    if lsm then
+        local f = lsm:Fetch("border", style, true)
+        if type(f) == "string" and f ~= "" then return f end
+    end
+    return nil
+end
+
+local function EnsureBackdrop(frame)
+    if frame and not frame.SetBackdrop and BackdropTemplateMixin then
+        Mixin(frame, BackdropTemplateMixin)
+    end
+end
+
+local function GetBgTexFile(name)
+    if not name or name == "" then return WHITE_TEX end
+    local lsm = LibStub and LibStub("LibSharedMedia-3.0", true)
+    if lsm then
+        local f = lsm:Fetch("statusbar", name, true) or lsm:Fetch("background", name, true)
+        if type(f) == "string" and f ~= "" then return f end
+    end
+    return WHITE_TEX
+end
+
+local function GetRowBorderTarget(f)
+    return (f and f._rowBorder) or f
+end
+
+local function ApplyRowBorderColor(f)
+    if not f then return end
+    local db    = LLF.db
+    local bFile = GetBorderFile(db and db.rowBorderStyle or "None")
+    if bFile then
+        local c = (db and db.rowBorderColor) or { 1, 1, 1, 1 }
+        f:SetBackdropBorderColor(c[1], c[2], c[3], c[4] or 1)
+    else
+        f:SetBackdropBorderColor(0, 0, 0, 0)
+    end
+end
+
+local function ApplyRowBorder(f)
+    EnsureBackdrop(f)
+    local db    = LLF.db
+    local style = db and db.rowBorderStyle or "None"
+    local sz    = (db and db.rowBorderSize) or 1
+    local bFile = GetBorderFile(style)
+    local bgTex = GetBgTexFile(db and db.rowBgTexture)
+    f:SetBackdrop({
+        bgFile   = bgTex,
+        edgeFile = WHITE_TEX,
+        edgeSize = 1,
+        insets   = { left = 0, right = 0, top = 0, bottom = 0 },
+    })
+    f:SetBackdropBorderColor(0, 0, 0, 0)
+    local bgA = (db and db.rowBgAlpha ~= nil) and db.rowBgAlpha or 0.80
+    if db and db.rowBgTexture and db.rowBgTexture ~= "" then
+        f:SetBackdropColor(1, 1, 1, bgA)
+    else
+        f:SetBackdropColor(0.05, 0.05, 0.07, bgA)
+    end
+    local border = f._rowBorder
+    if not border then
+        border = CreateFrame("Frame", nil, f, "BackdropTemplate")
+        border:SetFrameLevel(f:GetFrameLevel() + 1)
+        f._rowBorder = border
+    end
+    EnsureBackdrop(border)
+    border:ClearAllPoints()
+    border:SetPoint("TOPLEFT", f, "TOPLEFT", 0, 0)
+    border:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", 0, 0)
+    if bFile then
+        border:SetBackdrop({ edgeFile = bFile, edgeSize = sz })
+    else
+        border:SetBackdrop({ edgeFile = WHITE_TEX, edgeSize = 1 })
+    end
+    border:SetBackdropColor(0, 0, 0, 0)
+    ApplyRowBorderColor(border)
+end
 
 local RARITY_COLOR = {
     [0] = { 0.62, 0.62, 0.62 },
@@ -196,18 +279,12 @@ local function AcquireRow(parent)
     local f = table.remove(pool)
     if f then
         f:SetParent(parent)
+        ApplyRowBorder(f)
         return f
     end
 
     f = CreateFrame("Frame", nil, parent, "BackdropTemplate")
-    f:SetBackdrop({
-        bgFile   = "Interface\\Buttons\\WHITE8x8",
-        edgeFile = "Interface\\Buttons\\WHITE8x8",
-        tileEdge = false, edgeSize = 1,
-        insets   = { left=0, right=0, top=0, bottom=0 },
-    })
-    f:SetBackdropColor(0.05, 0.05, 0.07, 0.80)
-    f:SetBackdropBorderColor(0, 0, 0, 0)
+    ApplyRowBorder(f)
 
     local edge = f:CreateTexture(nil, "OVERLAY")
     edge:SetPoint("TOPLEFT",    f, 0, 0)
@@ -439,6 +516,9 @@ local function ReleaseRow(f)
     StopTrackedGlow(f, "_v")
     StopTrackedGlow(f, "_wl")
     f:SetBackdropBorderColor(0, 0, 0, 0)
+    if f._rowBorder then
+        f._rowBorder:SetBackdropBorderColor(0, 0, 0, 0)
+    end
     if f._instanceBtn then
         f._instanceBtn._whisperTarget  = nil
         f._instanceBtn._whisperLink    = nil
@@ -472,13 +552,15 @@ end
 
 local function ApplyRowGlow(f, entry)
     local db = LLF.db
-    local iconMode = (db.glowMode or 1) == 2
+    local iconMode = (db and db.glowMode or 1) == 2
     local barTarget  = f
+    local borderTarget = GetRowBorderTarget(f)
     local iconTarget = f._iconFrame
+
+    ApplyRowBorderColor(borderTarget)
 
     if not db.glowEnabled then
         StopTrackedGlow(f, "_v")
-        barTarget:SetBackdropBorderColor(0, 0, 0, 0)
     else
         local maxGold = 0
         if entry.price and entry.price > 0 then
@@ -519,11 +601,10 @@ local function ApplyRowGlow(f, entry)
                     f._vGlowKey    = "llf"
                 end
             else
-                barTarget:SetBackdropBorderColor(gc[1], gc[2], gc[3], 0.90)
+                borderTarget:SetBackdropBorderColor(gc[1], gc[2], gc[3], 0.90)
             end
         else
             StopTrackedGlow(f, "_v")
-            barTarget:SetBackdropBorderColor(0, 0, 0, 0)
         end
     end
 
@@ -668,10 +749,6 @@ local function PopulateRow(f, entry)
         for _, l in ipairs(f._iconBorderLines) do l:Hide() end
     end
 
-    local rowAlpha = (db.rowBgAlpha ~= nil) and db.rowBgAlpha or 0.80
-    f:SetBackdropColor(0.05, 0.05, 0.07, rowAlpha)
-    f:SetBackdropBorderColor(0, 0, 0, 0)
-
     f._count:SetText((db.showCount and count > 1) and (count .. "x") or "")
 
     local nameColor = "|cffffffff"
@@ -763,7 +840,7 @@ local function PopulateRow(f, entry)
             and entry.link
             and rar >= minRar
             and tradeable
-            and not entry.playerName  -- not a party loot row
+            and not entry.playerName
         if shouldOffer then
             oBtn._offerLink = entry.link
             oBtn:SetSize(16, 13)
@@ -782,7 +859,7 @@ local function PopulateRow(f, entry)
 end
 
 local rows      = {}
-Feed._rows = rows  -- expose for Options unlock reset
+Feed._rows = rows
 local feedFrame = nil
 
 local function ResizeFeedFrame()
@@ -898,14 +975,8 @@ function Feed:ApplyLayout()
 end
 
 function Feed:ApplyRowStyles()
-    local db    = LLF.db
-    local alpha = (db.rowBgAlpha ~= nil) and db.rowBgAlpha or 0.80
     for _, r in ipairs(rows) do
-        local f = r.rowFrame
-        if f.SetBackdropColor then
-            f:SetBackdropColor(0.05, 0.05, 0.07, alpha)
-            f:SetBackdropBorderColor(0, 0, 0, 0)
-        end
+        ApplyRowBorder(r.rowFrame)
     end
 end
 
@@ -1273,14 +1344,8 @@ function PFeed:ApplyLayout()
 end
 
 function PFeed:ApplyRowStyles()
-    local pdf   = LLF.db.partyFeed
-    local alpha = (pdf.rowBgAlpha ~= nil) and pdf.rowBgAlpha or 0.80
     for _, r in ipairs(partyRows) do
-        local f = r.rowFrame
-        if f.SetBackdropColor then
-            f:SetBackdropColor(0.05, 0.05, 0.07, alpha)
-            f:SetBackdropBorderColor(0, 0, 0, 0)
-        end
+        ApplyRowBorder(r.rowFrame)
     end
 end
 

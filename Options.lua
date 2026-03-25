@@ -38,7 +38,7 @@ local function N(b) _uid = _uid + 1; return ("LLF_Opt_%s%d"):format(b, _uid) end
 local isRefreshing = false
 local allToggles   = {}
 local allSliders   = {}
-local allPickers   = {}   -- list pickers that need refresh
+local allPickers   = {}
 
 local function RefreshAll()
     if not LLF.db then return end
@@ -332,7 +332,7 @@ end
 
 local LSM = LibStub and LibStub("LibSharedMedia-3.0", true)
 
-local activePickerList = nil  -- only one open at a time
+local activePickerList = nil
 
 local function MakeListPicker(parent, label, h, getVal, setVal, itemsFn)
     local cont = CreateFrame("Frame", N("LP"), parent)
@@ -358,7 +358,7 @@ local function MakeListPicker(parent, label, h, getVal, setVal, itemsFn)
 
     local btnFS = btn:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     btnFS:SetPoint("LEFT",  btn, 6, 0)
-    btnFS:SetPoint("RIGHT", btn, -22, 0)   -- leave room for arrow
+    btnFS:SetPoint("RIGHT", btn, -22, 0)
     btnFS:SetJustifyH("LEFT")
     btnFS:SetTextColor(WHITE[1], WHITE[2], WHITE[3], 1)
 
@@ -502,6 +502,79 @@ end
 
 local function SoundItems()
     return LLF:GetSoundList()
+end
+
+local function NormalizeMediaName(name)
+    local s = tostring(name or "")
+    s = s:match("^%s*(.-)%s*$") or s
+    s = s:gsub("%s+", " ")
+    return s:lower()
+end
+
+local BLOCKED_BORDER_NAMES = {
+    ["warpdeplte blank"] = true,
+    ["warpdeplete blank"] = true,
+    ["solid"] = true,
+    ["ayije empty"] = true,
+    ["ayije thin"] = true,
+    ["blizzard party"] = true,
+    ["blizzard dialog gold"] = true,
+    ["details bar border 1"] = true,
+    ["details bar border 2"] = true,
+    ["details bar border 3"] = true,
+}
+
+local function IsBlockedBorderName(name)
+    return BLOCKED_BORDER_NAMES[NormalizeMediaName(name)] == true
+end
+
+local BLOCKED_BG_EXACT = {
+    ["none"] = true,
+    ["testbar"] = true,
+    ["you are beautiful"] = true,
+    ["you are beaitufl"] = true,
+    ["you are the best"] = true,
+}
+
+local function IsBlockedBackgroundName(name)
+    local n = NormalizeMediaName(name)
+    if n:find("naowh", 1, true) then return true end
+    if n:find("toxi ui", 1, true) then return true end
+    if n:find("toxiui", 1, true) then return true end
+    return BLOCKED_BG_EXACT[n] == true
+end
+
+local function TextureItems()
+    local lsm = LibStub and LibStub("LibSharedMedia-3.0", true)
+    local items = { { value = "", display = "Default (Flat)" } }
+    if lsm then
+        local seen, names = {}, {}
+        local bars = lsm:HashTable("statusbar")
+        if bars then
+            for name in pairs(bars) do
+                if not seen[name] then
+                    seen[name] = true
+                    names[#names+1] = name
+                end
+            end
+        end
+        local bgs = lsm:HashTable("background")
+        if bgs then
+            for name in pairs(bgs) do
+                if not seen[name] then
+                    seen[name] = true
+                    names[#names+1] = name
+                end
+            end
+        end
+        table.sort(names)
+        for _, name in ipairs(names) do
+            if not IsBlockedBackgroundName(name) then
+                items[#items+1] = { value = name, display = name }
+            end
+        end
+    end
+    return items
 end
 
 local function GateSlider(sc, active)
@@ -781,6 +854,103 @@ local function PageGeneral(parent, CW)
         allToggles[#allToggles + 1] = sentinel
         p.SetY(y0 - ROW_H - p.SEP)
     end
+
+    p.Sep(6)
+    p.Header("Row Appearance")
+
+    local function BorderItems()
+        local lsm = LibStub and LibStub("LibSharedMedia-3.0", true)
+        local items = { { value = "None", display = "None" } }
+        if lsm then
+            local borders = lsm:HashTable("border")
+            if borders then
+                local names = {}
+                for name in pairs(borders) do
+                    if name ~= "None" and name ~= "none" and not IsBlockedBorderName(name) then
+                        names[#names+1] = name
+                    end
+                end
+                table.sort(names)
+                for _, name in ipairs(names) do
+                    items[#items+1] = { value = name, display = name }
+                end
+            end
+        end
+        return items
+    end
+
+    local function ApplyBorderChange()
+        LLF.Feed:ApplyRowStyles()
+        LLF.PartyFeed:ApplyRowStyles()
+        LLF.Feed:RefreshTestRows()
+        LLF.PartyFeed:RefreshTestRows()
+    end
+
+    p.Picker("Background texture", 40,
+        function() return LLF.db.rowBgTexture or "" end,
+        function(v)
+            LLF.db.rowBgTexture = v
+            ApplyBorderChange()
+        end,
+        TextureItems)
+
+    p.Picker("Border texture", 40,
+        function() return LLF.db.rowBorderStyle or "None" end,
+        function(v)
+            LLF.db.rowBorderStyle = v
+            ApplyBorderChange()
+        end,
+        BorderItems)
+
+    p.SlideInput("Border size", 1, 32, 1,
+        function() return LLF.db.rowBorderSize or 1 end,
+        function(v)
+            LLF.db.rowBorderSize = v
+            ApplyBorderChange()
+        end)
+
+    do
+        local bcy = p.GetY()
+        local lbl = parent:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+        lbl:SetPoint("TOPLEFT", parent, p.PAD, bcy - 2)
+        lbl:SetText("Border color")
+        lbl:SetTextColor(WHITE[1], WHITE[2], WHITE[3], 0.80)
+
+        local swatch = CreateFrame("Button", N("BCS"), parent, "BackdropTemplate")
+        swatch:SetSize(22, 22)
+        swatch:SetPoint("LEFT", lbl, "RIGHT", 10, 2)
+        swatch:SetBackdrop(FLAT_BD)
+        swatch:SetBackdropBorderColor(0.5, 0.5, 0.5, 0.8)
+
+        local function SyncSwatch()
+            local c = LLF.db.rowBorderColor or { 1, 1, 1, 1 }
+            swatch:SetBackdropColor(c[1], c[2], c[3], 1)
+        end
+        SyncSwatch()
+
+        swatch:SetScript("OnClick", function()
+            local c = LLF.db.rowBorderColor or { 1, 1, 1, 1 }
+            local info = {
+                r = c[1], g = c[2], b = c[3],
+                swatchFunc = function()
+                    local r, g, b = ColorPickerFrame:GetColorRGB()
+                    LLF.db.rowBorderColor = { r, g, b, 1 }
+                    SyncSwatch(); ApplyBorderChange()
+                end,
+                cancelFunc = function(prev)
+                    LLF.db.rowBorderColor = { prev.r, prev.g, prev.b, 1 }
+                    SyncSwatch(); ApplyBorderChange()
+                end,
+            }
+            ColorPickerFrame:SetupColorPickerAndShow(info)
+        end)
+        swatch:SetScript("OnEnter", function(s) s:SetBackdropBorderColor(1, 1, 1, 1) end)
+        swatch:SetScript("OnLeave", function(s) s:SetBackdropBorderColor(0.5, 0.5, 0.5, 0.8) end)
+
+        allToggles[#allToggles + 1] = { Sync = SyncSwatch }
+        p.SetY(bcy - ROW_H - p.SEP)
+    end
+
     p.Sep(4)
     p.SlideInput("Max name length", 10, 60, 1,
         function() return LLF.db.maxNameLength or 32 end,
@@ -958,7 +1128,7 @@ local function PageLayout(parent, CW)
             }
         end)
 
-    p.Sep(18)  -- space for hint label above editbox
+    p.Sep(18)
     local y2 = p.GetY()
     local oCont = CreateFrame("Frame", N("OF_EC"), parent, "BackdropTemplate")
     oCont:SetHeight(26)
@@ -1657,7 +1827,7 @@ local function PagePartyFeed(parent, CW)
         end)
 
     p.Sep(2)
-    p.Sep(18)  -- space for hint label above editbox
+    p.Sep(18)
     local y0 = p.GetY()
     local cont = CreateFrame("Frame", N("NB_EC"), parent, "BackdropTemplate")
     cont:SetHeight(26)
@@ -3066,7 +3236,7 @@ local function PageProfiles(parent, CW)
                         local numStr = s:match("^%[([%d%.%-]+)%]", pos)
                         if numStr then
                             key = tonumber(numStr)
-                            pos = pos + #numStr + 2 -- skip [N]
+                            pos = pos + #numStr + 2
                             while pos <= #s and s:sub(pos,pos):match("[%s=]") do pos = pos + 1 end
                         end
                     else
