@@ -16,11 +16,11 @@ Config.DEFAULTS = {
     feedBgAlpha      = 0.75,
     rowBgAlpha       = 0.80,
     feedLocked       = false,
-    feedFont         = "",
+    feedFont         = "",      -- empty = auto from LSM
     durations = {
         [0] = 3,  [1] = 5,  [2] = 5,  [3] = 7,
         [4] = 10, [5] = 15, [6] = 5,  [7] = 7,
-        [8] = 5,
+        [8] = 5,  -- Honor
         gold = 5,
         rep  = 5,
     },
@@ -52,6 +52,7 @@ Config.DEFAULTS = {
     showTransmogIndicator = true,
     showTransmogParty    = false,
     showUpgradeTrack     = true,
+    showCraftingQuality  = true,
     iconBorderThickness = 2,
     showRep          = true,
     showInvCount     = false,
@@ -78,15 +79,13 @@ Config.DEFAULTS = {
         },
     },
     suppressDefaultLoot = false,
+    suppressTransmogToast = false,
     shiftClickBlacklist = true,
     blacklistEnabled = true,
     blacklist   = {},
     wishlist    = {},
     wishlistEnabled   = false,
     wishlistGroupLoot = false,
-    wishlistFilterNonGear = false,
-    wishlistFilterCurrency = false,
-    wishlistFilterMountsPets = false,
     showMinimap = true,
     minimapIcon = {},
 
@@ -107,8 +106,8 @@ Config.DEFAULTS = {
     wishlistGlowColor   = { 1, 0.84, 0, 1 },
 
     soundEnabled   = false,
-    soundThreshold = 200,
-    soundChoice    = 1,
+    soundThreshold = 200,   -- gold
+    soundChoice    = 1,     -- index into LLF.SOUNDS
     wishlistSoundEnabled = false,
     wishlistSoundChoice  = 1,
 
@@ -329,6 +328,7 @@ function Config:RenameProfile(oldName, newName)
     return true
 end
 
+-- blacklist[itemID] = { name, icon, rarity, link }
 function Config:InitBlacklist()
     local bl = LLF.db.blacklist
     if type(bl) == "table" then

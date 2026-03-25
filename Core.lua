@@ -154,6 +154,63 @@ do
     end
 end
 
+local function GetCraftingQuality(link, itemID)
+    local t = C_TradeSkillUI
+    if type(t) ~= "table" then return nil end
+    local itemStr = link
+    if type(itemStr) == "string" then
+        local s = itemStr:match("|H(item:[^|]+)|h")
+        if s then itemStr = s end
+    end
+    local function pick(a, b)
+        if type(a) == "number" and a > 0 then return a end
+        if type(b) == "number" and b > 0 then return b end
+        return nil
+    end
+    if itemStr then
+        if type(t.GetItemReagentQualityByItemInfo) == "function" then
+            local ok, a, b = pcall(t.GetItemReagentQualityByItemInfo, itemStr)
+            local v = ok and pick(a, b) or nil
+            if v then return v end
+        end
+        if type(t.GetItemCraftedQualityByItemInfo) == "function" then
+            local ok, a, b = pcall(t.GetItemCraftedQualityByItemInfo, itemStr)
+            local v = ok and pick(a, b) or nil
+            if v then return v end
+        end
+    end
+    if itemStr ~= link then
+        if type(t.GetItemReagentQualityByItemInfo) == "function" then
+            local ok, a, b = pcall(t.GetItemReagentQualityByItemInfo, link)
+            local v = ok and pick(a, b) or nil
+            if v then return v end
+        end
+        if type(t.GetItemCraftedQualityByItemInfo) == "function" then
+            local ok, a, b = pcall(t.GetItemCraftedQualityByItemInfo, link)
+            local v = ok and pick(a, b) or nil
+            if v then return v end
+        end
+    end
+    if itemID then
+        local idStr = ("item:%d"):format(itemID)
+        if type(t.GetItemReagentQualityByItemInfo) == "function" then
+            local ok, a, b = pcall(t.GetItemReagentQualityByItemInfo, idStr)
+            local v = ok and pick(a, b) or nil
+            if v then return v end
+        end
+        if type(t.GetItemCraftedQualityByItemInfo) == "function" then
+            local ok, a, b = pcall(t.GetItemCraftedQualityByItemInfo, idStr)
+            local v = ok and pick(a, b) or nil
+            if v then return v end
+        end
+        if type(t.GetItemCraftingQualityByID) == "function" then
+            local ok, a = pcall(t.GetItemCraftingQualityByID, itemID)
+            if ok and type(a) == "number" and a > 0 then return a end
+        end
+    end
+    return nil
+end
+
 local _upgradePattern
 local function GetUpgradeTrackTier(link)
     if not link then return nil end
@@ -201,6 +258,8 @@ local function EntryFromLink(link, count, source)
     local displaySubType = CATEGORY_LABELS[category] or (isGear and itemSubType or nil)
     local trackTier = isGear and GetUpgradeTrackTier(link) or nil
 
+    local craftingQuality = GetCraftingQuality(link, tonumber(itemID))
+
     return {
         icon     = icon,
         name     = name,
@@ -219,6 +278,7 @@ local function EntryFromLink(link, count, source)
         mergeKey = "item:" .. itemID,
         itemCategory = category,
         upgradeTrackTier = trackTier,
+        craftingQuality  = craftingQuality,
     }
 end
 
@@ -281,6 +341,7 @@ local function HandleChatMsgLoot(msg, _, _, _, sender)
     if dash then receiver = receiver:sub(1, dash - 1) end
 
     local isMe = msg:match("^You receive") ~= nil
+              or msg:match(" was changed to ") ~= nil
               or (receiver ~= "" and receiver == UnitName("player"))
 
     if not isMe then
@@ -295,8 +356,9 @@ local function HandleChatMsgLoot(msg, _, _, _, sender)
                 local inParty = IsInGroup() and not inRaid
                 if (inParty and pdf.showParty) or (inRaid and pdf.showRaid) then
                     if (GetTime() - lastLootEventAt) > 5 then return end
-                    local link = msg:match("(|c%x%x%x%x%x%x%x%x|Hitem:.-|h%[.-%]|h|r)")
-                              or msg:match("(|Hitem:.-|h%[.-%]|h)")
+                    local link
+                    for m in msg:gmatch("(|c%x%x%x%x%x%x%x%x|Hitem:.-|h%[.-%]|h|r)") do link = m end
+                    if not link then link = msg:match("(|Hitem:.-|h%[.-%]|h)") end
                     if link then
                         local entry = EntryFromLink(link, tonumber(msg:match("x(%d+)%s*$")) or 1, 4)
                         if entry and not ShouldFilterCategory(entry.itemCategory, true) then
@@ -312,8 +374,9 @@ local function HandleChatMsgLoot(msg, _, _, _, sender)
         return
     end
 
-    local link = msg:match("(|c%x%x%x%x%x%x%x%x|Hitem:.-|h%[.-%]|h|r)")
-              or msg:match("(|Hitem:.-|h%[.-%]|h)")
+    local link
+    for m in msg:gmatch("(|c%x%x%x%x%x%x%x%x|Hitem:.-|h%[.-%]|h|r)") do link = m end
+    if not link then link = msg:match("(|Hitem:.-|h%[.-%]|h)") end
     if not link then return end
     local itemID = link:match("item:(%d+)") or link
     if recentLoot[itemID] then return end
@@ -428,8 +491,11 @@ local function HandleQuestLoot(_, itemID, count)
     if entry then entry.rarity = 7; LLF.Feed:AddEntry(entry) end
 end
 
-local lootSuppressHooked    = false
-local lootFrameHooksSetup   = false
+-- Loot suppression
+
+local lootSuppressHooked      = false
+local lootFrameHooksSetup     = false
+local transmogSuppressHooked  = false
 
 local function HideActiveLootAlerts()
     if not AlertFrame then return end
@@ -487,6 +553,28 @@ local function SetupLootSuppressionFrameHooks()
     end)
 end
 
+local function SetupTransmogSuppression()
+    if transmogSuppressHooked then return end
+    if not _G.NewCosmeticAlertFrameSystem then return end
+    if not AlertFrame or not AlertFrame.AddAlertFrame then return end
+    transmogSuppressHooked = true
+    hooksecurefunc(_G.NewCosmeticAlertFrameSystem, "setUpFunction", function(frame)
+        if type(frame) ~= "table" then return end
+        frame._llfCosmetic = true
+    end)
+    hooksecurefunc(AlertFrame, "AddAlertFrame", function(_, frame)
+        if not frame or not frame._llfCosmetic then return end
+        frame._llfCosmetic = nil
+        if not LLF.db or not LLF.db.suppressTransmogToast then return end
+        C_Timer.After(0, function()
+            if AlertFrame and AlertFrame.RemoveAlertFrame then
+                AlertFrame:RemoveAlertFrame(frame)
+            end
+            frame:Hide()
+        end)
+    end)
+end
+
 local eventFrame = CreateFrame("Frame", "LarlenLootFrameEventFrame")
 eventFrame:RegisterEvent("ADDON_LOADED")
 eventFrame:RegisterEvent("PLAYER_LOGIN")
@@ -530,6 +618,7 @@ eventFrame:SetScript("OnEvent", function(_, event, ...)
     elseif event == "PLAYER_LOGIN" then
         LLF.Minimap:ApplyVisibility()
         SetupLootSuppressionFrameHooks()
+        SetupTransmogSuppression()
 
     elseif event == "PLAYER_MONEY" then
         HandleMoney()

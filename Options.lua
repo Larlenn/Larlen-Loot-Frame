@@ -46,8 +46,6 @@ local function RefreshAll()
     for _, t in ipairs(allToggles) do if t.Sync   then t:Sync()     end end
     for _, s in ipairs(allSliders) do if s._refresh then s._refresh() end end
     for _, p in ipairs(allPickers) do if p._refresh then p._refresh() end end
-    if LLF.Feed and LLF.Feed.RefreshTestRows then LLF.Feed:RefreshTestRows() end
-    if LLF.PartyFeed and LLF.PartyFeed.RefreshTestRows then LLF.PartyFeed:RefreshTestRows() end
     isRefreshing = false
 end
 Opt.RefreshAll = RefreshAll
@@ -162,7 +160,7 @@ local function MakeSlider(parent, label, minV, maxV, step, getVal, setVal, suffi
     local s = CreateFrame("Slider", N("SL"), cont, "BackdropTemplate")
     s:SetOrientation("HORIZONTAL"); s:SetMinMaxValues(minV, maxV); s:SetValueStep(step or 1)
     s:SetAllPoints(track)
-    s:SetHitRectInsets(0, 0, -10, -10)  -- expand clickable area 10px above and below track
+    s:SetHitRectInsets(0, 0, -10, -10)
     s:SetBackdrop({ bgFile = "Interface\\Buttons\\WHITE8x8" })
     s:SetBackdropColor(0, 0, 0, 0); s:SetBackdropBorderColor(0, 0, 0, 0)
 
@@ -235,7 +233,7 @@ local function MakeSliderWithInput(parent, label, minV, maxV, step, getVal, setV
             if idx then raw = raw:sub(1, idx - 1) end
         end
         raw = raw:gsub("%s", "")
-        return tonumber(raw)  -- handles 12.5, 5, 0, etc.
+        return tonumber(raw)
     end
 
     local track = CreateFrame("Frame", nil, cont, "BackdropTemplate")
@@ -475,7 +473,6 @@ local function MakeListPicker(parent, label, h, getVal, setVal, itemsFn)
     Refresh()
     cont._refresh = Refresh
     cont._list    = list
-    cont._btn     = btn
     allPickers[#allPickers + 1] = cont
     return cont
 end
@@ -520,6 +517,7 @@ local function GateSlider(sc, active)
         sc._eb:SetTextColor(ACCENT[1], ACCENT[2], ACCENT[3], active and 1 or 0.3)
         sc._eb:SetBackdropBorderColor(ACCENT[1], ACCENT[2], ACCENT[3], active and 0.45 or 0.15)
         sc._eb:SetBackdropColor(0.08, 0.08, 0.11, active and 1 or 0.4)
+        sc._eb:EnableMouse(active)
         if not active and sc._eb:HasFocus() then sc._eb:ClearFocus() end
     end
 end
@@ -642,6 +640,9 @@ local function PageGeneral(parent, CW)
     p.Row("Hide Blizzard loot window and toasts",
         function() return LLF.db.suppressDefaultLoot end,
         function(v) LLF.db.suppressDefaultLoot = v end)
+    p.Row("Hide \"You collected\" transmog popup",
+        function() return LLF.db.suppressTransmogToast end,
+        function(v) LLF.db.suppressTransmogToast = v end)
     p.Row("Shift + Right-Click to blacklist items",
         function() return LLF.db.shiftClickBlacklist end,
         function(v) LLF.db.shiftClickBlacklist = v end)
@@ -688,9 +689,20 @@ local function PageGeneral(parent, CW)
             if LLF.PartyFeed then LLF.PartyFeed:ApplyFont() end
             LLF.Feed:RefreshTestRows(); LLF.PartyFeed:RefreshTestRows()
         end)
-    p.RowR("Show bag count",
+    p.RowR("Show owned count",
         function() return LLF.db.showInvCount end,
-        function(v) LLF.db.showInvCount = v; LLF.Feed:RefreshTestRows(); LLF.PartyFeed:RefreshTestRows() end)
+        function(v)
+            LLF.db.showInvCount = v
+            LLF.Feed:ApplyFont()
+            if LLF.PartyFeed then LLF.PartyFeed:ApplyFont() end
+            LLF.Feed:RefreshTestRows(); LLF.PartyFeed:RefreshTestRows()
+        end)
+    p.RowL("Show crafting/gathering quality icon",
+        function() return LLF.db.showCraftingQuality ~= false end,
+        function(v) LLF.db.showCraftingQuality = v; LLF.Feed:RefreshTestRows(); LLF.PartyFeed:RefreshTestRows() end)
+    p.RowR("Show upgrade track tier",
+        function() return LLF.db.showUpgradeTrack ~= false end,
+        function(v) LLF.db.showUpgradeTrack = v; LLF.Feed:RefreshTestRows(); LLF.PartyFeed:RefreshTestRows() end)
     p.RowL("Show rarity color bar",
         function() return LLF.db.showRarityBar ~= false end,
         function(v)
@@ -853,19 +865,9 @@ local function PageLayout(parent, CW)
     local y1 = p.GetY()
     local testBtn = MakeBtn(parent, "Test Rows", 110, ROW_H)
     testBtn:SetPoint("TOPLEFT", parent, p.PAD, y1)
-    testBtn:SetScript("OnClick", function() LLF.Feed:Preview() end)
+    testBtn:SetScript("OnClick", function() LLF.Feed._previewSoundPlayed = false; LLF.Feed:Preview() end)
     local clearBtn = MakeBtn(parent, "Clear Test", 100, ROW_H)
     clearBtn:SetPoint("LEFT", testBtn, "RIGHT", 6, 0)
-    clearBtn:SetScript("OnClick", function()
-        LLF.Feed.testLocked = false
-        LLF.Feed:ClearAll()
-        if lockTestBtn then
-            lockTestBtn._fs:SetText("Lock Test")
-            lockTestBtn:SetBackdropBorderColor(ACCENT[1], ACCENT[2], ACCENT[3], 0.45)
-            lockTestBtn:SetBackdropColor(BTN_BG[1], BTN_BG[2], BTN_BG[3], BTN_BG[4])
-        end
-    end)
-
     local lockTestBtn = MakeBtn(parent, "Lock Test", 90, ROW_H)
     lockTestBtn:SetPoint("LEFT", clearBtn, "RIGHT", 6, 0)
     local function SyncLockBtn()
@@ -879,6 +881,11 @@ local function PageLayout(parent, CW)
             lockTestBtn:SetBackdropColor(BTN_BG[1], BTN_BG[2], BTN_BG[3], BTN_BG[4])
         end
     end
+    clearBtn:SetScript("OnClick", function()
+        LLF.Feed.testLocked = false
+        LLF.Feed:ClearAll()
+        SyncLockBtn()
+    end)
     lockTestBtn:SetScript("OnClick", function()
         LLF.Feed.testLocked = not LLF.Feed.testLocked
         if LLF.Feed.testLocked then
@@ -1370,7 +1377,7 @@ local function PagePrice(parent, CW)
     ApplyGlowGating = function()
         local on = LLF.db.glowEnabled == true
         local gt = LLF.db.glowType or 1
-                local linesOK = on and (gt ~= 3)
+        local linesOK = on and (gt ~= 3)
         local speedOK = on
         local thickOK = on and (gt ~= 3)
         for _, ctrl in ipairs(glowGatedControls) do
@@ -1577,16 +1584,6 @@ local function PagePartyFeed(parent, CW)
     testBtn:SetScript("OnClick", function() LLF.PartyFeed:Preview() end)
     local clearBtn = MakeBtn(parent, "Clear Test", 100, ROW_H)
     clearBtn:SetPoint("LEFT", testBtn, "RIGHT", 6, 0)
-    clearBtn:SetScript("OnClick", function()
-        LLF.PartyFeed.testLocked = false
-        LLF.PartyFeed:ClearAll()
-        if pLockTestBtn then
-            pLockTestBtn._fs:SetText("Lock Test")
-            pLockTestBtn:SetBackdropBorderColor(ACCENT[1], ACCENT[2], ACCENT[3], 0.45)
-            pLockTestBtn:SetBackdropColor(BTN_BG[1], BTN_BG[2], BTN_BG[3], BTN_BG[4])
-        end
-    end)
-
     local pLockTestBtn = MakeBtn(parent, "Lock Test", 90, ROW_H)
     pLockTestBtn:SetPoint("LEFT", clearBtn, "RIGHT", 6, 0)
     local function SyncPLockBtn()
@@ -1600,6 +1597,11 @@ local function PagePartyFeed(parent, CW)
             pLockTestBtn:SetBackdropColor(BTN_BG[1], BTN_BG[2], BTN_BG[3], BTN_BG[4])
         end
     end
+    clearBtn:SetScript("OnClick", function()
+        LLF.PartyFeed.testLocked = false
+        LLF.PartyFeed:ClearAll()
+        SyncPLockBtn()
+    end)
     SyncPLockBtn()
     pLockTestBtn:SetScript("OnClick", function()
         LLF.PartyFeed.testLocked = not LLF.PartyFeed.testLocked
@@ -1825,29 +1827,17 @@ local function PageAudio(parent, CW)
     p.SetY(y1 - 40 - SEP)
 
     local function SyncWlSound()
-        local on = LLF.db.wishlistSoundEnabled
+        local wlOn = LLF.db.wishlistEnabled
+        local on = wlOn and LLF.db.wishlistSoundEnabled
+        wlSndToggle:EnableMouse(wlOn)
+        wlSndToggle:SetAlpha(wlOn and 1 or 0.35)
         lp2:SetAlpha(on and 1 or 0.35)
         lp2:EnableMouse(on)
-        if lp2._btn then lp2._btn:EnableMouse(on) end
         playBtn2:SetAlpha(on and 1 or 0.35)
         playBtn2:EnableMouse(on)
     end
     SyncWlSound()
     hooksecurefunc(wlSndToggle, "Sync", SyncWlSound)
-
-    local function SyncWlSndSection()
-        local wlOn = LLF.db.wishlistEnabled
-        wlSndToggle:EnableMouse(wlOn)
-        wlSndToggle:SetAlpha(wlOn and 1 or 0.35)
-        if not wlOn then
-            lp2:SetAlpha(0.35); lp2:EnableMouse(false)
-            if lp2._btn then lp2._btn:EnableMouse(false) end
-            playBtn2:SetAlpha(0.35); playBtn2:EnableMouse(false)
-        end
-    end
-    SyncWlSndSection()
-    hooksecurefunc(wlSndToggle, "Sync", SyncWlSndSection)
-    allToggles[#allToggles + 1] = wlSndToggle
 
     p.Finalize()
 end
@@ -1864,7 +1854,7 @@ local function PageBlacklist(parent, CW)
 
     p.Sep(6)
 
-    local listCont  -- forward declare for SyncBlToggle
+    local listCont
     local addCont_ref, addBtn_ref, searchCont_ref
     local function SyncBlToggle()
         local enabled = LLF.db.blacklistEnabled
@@ -2093,7 +2083,6 @@ local function PageBlacklist(parent, CW)
             r._removeBtn:SetScript("OnClick", function()
                 gdb.blacklist[capturedID] = nil
                 RebuildBlacklist()
-                RefreshAll()
             end)
 
             y = y - ITEM_ROW
@@ -2199,7 +2188,6 @@ local function PageBlacklist(parent, CW)
         searchEB:SetText("")
         searchPlaceholder:Show()
         RebuildBlacklist()
-        RefreshAll()
     end
 
     addEB:SetScript("OnTextChanged", function(self, userInput)
@@ -2276,7 +2264,7 @@ end
 local function PageWishlist(parent, CW)
     local p = MakePage(parent, CW)
     p.Header("Item Wishlist")
-    p.Label("|cffaaaaaaOnly wishlisted items appear in your feed. Gold, currency, rep, and honor are unaffected unless toggled below.|r")
+    p.Label("|cffaaaaaaOnly wishlisted items appear in your feed. Gold, currency, rep, and honor are unaffected.|r")
     p.Sep(6)
 
     local wlToggle = p.RowL("Enable wishlist filter",
@@ -2284,24 +2272,15 @@ local function PageWishlist(parent, CW)
         function(v) LLF.db.wishlistEnabled = v; RefreshAll() end)
     local grpToggle = p.RowR("Also apply to group loot",
         function() return LLF.db.wishlistGroupLoot == true end,
-        function(v) LLF.db.wishlistGroupLoot = v; RefreshAll() end)
-    local currencyToggle = p.RowL("Filter gold/currency/rep/honor",
-        function() return LLF.db.wishlistFilterCurrency == true end,
-        function(v) LLF.db.wishlistFilterCurrency = v; RefreshAll() end)
-    local mountsPetsToggle = p.RowR("Filter mounts/pets",
-        function() return LLF.db.wishlistFilterMountsPets == true end,
-        function(v) LLF.db.wishlistFilterMountsPets = v; RefreshAll() end)
-    allToggles[#allToggles + 1] = currencyToggle
-    allToggles[#allToggles + 1] = mountsPetsToggle
+        function(v) LLF.db.wishlistGroupLoot = v end)
 
-    local listCont  -- forward declare so SyncGroupToggle can access it
+    local listCont
     local function SyncGroupToggle()
         local enabled = LLF.db.wishlistEnabled
         grpToggle:EnableMouse(enabled)
         grpToggle:SetAlpha(enabled and 1 or 0.35)
-        if currencyToggle then currencyToggle:EnableMouse(enabled); currencyToggle:SetAlpha(enabled and 1 or 0.35) end
-        if mountsPetsToggle then mountsPetsToggle:EnableMouse(enabled); mountsPetsToggle:SetAlpha(enabled and 1 or 0.35) end
         if listCont then listCont:SetAlpha(enabled and 1 or 0.35) end
+        if ApplyWlGlowGating then ApplyWlGlowGating() end
     end
     SyncGroupToggle()
     hooksecurefunc(wlToggle, "Sync", SyncGroupToggle)
@@ -2523,7 +2502,6 @@ local function PageWishlist(parent, CW)
             r._removeBtn:SetScript("OnClick", function()
                 gdb.wishlist[capturedID] = nil
                 RebuildWishlist()
-                RefreshAll()
             end)
 
             y = y - ITEM_ROW
@@ -2726,11 +2704,13 @@ local function PageWishlist(parent, CW)
     local wlGlowGatedControls = { wlGlowTypePicker }
 
     ApplyWlGlowGating = function()
-        local on = LLF.db.wishlistGlowEnabled == true
+        local wlOn = LLF.db.wishlistEnabled
+        local on = wlOn and LLF.db.wishlistGlowEnabled == true
         local gt = LLF.db.wishlistGlowType or 1
         local linesOK = on and (gt ~= 3)
         local speedOK = on
         local thickOK = on and (gt ~= 3)
+        if wlGlowToggle then wlGlowToggle:EnableMouse(wlOn); wlGlowToggle:SetAlpha(wlOn and 1 or 0.35) end
         for _, ctrl in ipairs(wlGlowGatedControls) do
             if ctrl then ctrl:SetAlpha(on and 1 or 0.35); ctrl:EnableMouse(on) end
         end
@@ -2751,7 +2731,7 @@ local function PageWishlist(parent, CW)
     for _, sc in ipairs({ wlGlowLines, wlGlowSpeed, wlGlowThick }) do
         if sc._eb then
             sc._eb:HookScript("OnEditFocusGained", function(self)
-                if not LLF.db.wishlistGlowEnabled then self:ClearFocus() end
+                if not LLF.db.wishlistEnabled or not LLF.db.wishlistGlowEnabled then self:ClearFocus() end
             end)
         end
     end
@@ -3083,10 +3063,10 @@ local function PageProfiles(parent, CW)
                     if s:sub(pos,pos) == "}" then pos = pos + 1; break end
                     local key, val
                     if s:sub(pos,pos) == "[" then
-                                                local numStr = s:match("^%[([%d%.%-]+)%]", pos)
+                        local numStr = s:match("^%[([%d%.%-]+)%]", pos)
                         if numStr then
                             key = tonumber(numStr)
-                            pos = pos + #numStr + 2
+                            pos = pos + #numStr + 2 -- skip [N]
                             while pos <= #s and s:sub(pos,pos):match("[%s=]") do pos = pos + 1 end
                         end
                     else
@@ -3099,7 +3079,7 @@ local function PageProfiles(parent, CW)
                 end
                 return t, pos
             elseif c == '"' then
-                                local result = {}; pos = pos + 1
+                local result = {}; pos = pos + 1
                 while pos <= #s do
                     local ch = s:sub(pos, pos)
                     if ch == "\\" then
@@ -3330,6 +3310,7 @@ local function BuildFloatWindow()
     floatWin:SetBackdropColor(0.06, 0.06, 0.08, 0.97)
     floatWin:SetBackdropBorderColor(ACCENT[1]*0.35, ACCENT[2]*0.35, ACCENT[3]*0.35, 0.80)
     floatWin:Hide()
+    tinsert(UISpecialFrames, "LarlenLootFrameOptions")
 
     floatWin:HookScript("OnHide", function()
         if activePickerList then activePickerList:Hide(); activePickerList = nil end
@@ -3526,7 +3507,6 @@ local function BuildFloatWindow()
             wipe(LLF.db.blacklist)
             
             if LLF.Options._blRebuild then LLF.Options._blRebuild() end
-            RefreshAll()
         end
     end)
     blClearAllBtn:Hide()
@@ -3538,7 +3518,6 @@ local function BuildFloatWindow()
             wipe(LLF.db.wishlist)
             
             if LLF.Options._wlRebuild then LLF.Options._wlRebuild() end
-            RefreshAll()
         end
     end)
     wlClearAllBtn:Hide()
@@ -3620,12 +3599,6 @@ local function BuildFloatWindow()
     floatWin:HookScript("OnShow", function()
         ShowPage(currentPage or "general")
     end)
-    floatWin:SetScript("OnKeyDown", function(self, key)
-        if key == "ESCAPE" then
-            self:Hide()
-        end
-    end)
-    floatWin:EnableKeyboard(true)
 end
 
 

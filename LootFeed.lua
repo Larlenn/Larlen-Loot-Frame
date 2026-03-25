@@ -27,6 +27,15 @@ local DEFAULT_COLOR = { 1.00, 1.00, 1.00 }
 local SUBTEXT_COLOR = { 0.70, 0.70, 0.75, 1.00 }
 local RARITY_HEX = {}
 
+local UPGRADE_TRACK_TEXT = {
+    [1] = "|cff9d9d9dExpl|r",
+    [2] = "|cff1eff00Adv|r",
+    [3] = "|cff0070ddVet|r",
+    [4] = "|cffa335eeChamp|r",
+    [5] = "|cffff8000Hero|r",
+    [6] = "|cffe6cc80Myth|r",
+}
+
 local CATEGORY_COLOR = {
     pet   = { 0.25, 0.88, 0.68 },
     mount = { 0.85, 0.70, 0.25 },
@@ -43,6 +52,7 @@ local LSM = LibStub and LibStub("LibSharedMedia-3.0", true)
 local LCG = LibStub and LibStub("LibCustomGlow-1.0", true)
 
 local _subParts   = {}
+local _stParts    = {}
 local _priceLines = {}
 local _glowColor  = { 1, 1, 1, 0.9 }
 local _wlColor    = { 1, 0.84, 0, 1 }
@@ -217,7 +227,7 @@ local function AcquireRow(parent)
     f._icon = icon
 
     local function MakeEdgeLine()
-        local t = iconFrame:CreateTexture(nil, "OVERLAY")
+        local t = f:CreateTexture(nil, "OVERLAY")
         t:SetColorTexture(1, 1, 1, 1)
         t:SetSize(1, 1)
         return t
@@ -634,7 +644,8 @@ local function PopulateRow(f, entry)
         end
     end
 
-    local rc = RARITY_COLOR[entry.rarity or 1] or DEFAULT_COLOR
+    local rc = (entry.itemCategory and CATEGORY_COLOR[entry.itemCategory])
+            or RARITY_COLOR[entry.rarity or 1] or DEFAULT_COLOR
 
     if db.showRarityBar ~= false then
         f._edge:SetColorTexture(rc[1], rc[2], rc[3], 0.85)
@@ -683,25 +694,34 @@ local function PopulateRow(f, entry)
     if entry.playerName then
         subParts[#subParts+1] = "|cff99ccff" .. entry.playerName .. "|r"
     end
-    if db.showSubType and entry.subType and #entry.subType > 0 and (entry.isGear or entry.itemCategory) then
-        local color = entry.itemCategory and "|cff44ddff" or "|cffddaa55"
-        f._subType:SetText(color .. (SUBTYPE_SHORT[entry.subType] or entry.subType) .. "|r")
-    else
-        f._subType:SetText("")
+    do
+        local stParts = _stParts
+        wipe(stParts)
+        if db.showSubType and entry.subType and #entry.subType > 0 and (entry.isGear or entry.itemCategory) then
+            local color = entry.itemCategory and "|cff44ddff" or "|cffddaa55"
+            stParts[#stParts+1] = color .. (SUBTYPE_SHORT[entry.subType] or entry.subType) .. "|r"
+        end
+        if entry.isGear and db.showUpgradeTrack ~= false and entry.upgradeTrackTier then
+            local txt = UPGRADE_TRACK_TEXT[entry.upgradeTrackTier]
+            if txt then stParts[#stParts+1] = txt end
+        end
+        if db.showCraftingQuality ~= false and entry.craftingQuality and entry.craftingQuality > 0 then
+            local t = math.min(entry.craftingQuality, 5)
+            stParts[#stParts+1] = CreateAtlasMarkup("Professions-ChatIcon-Quality-Tier" .. t, 16, 16)
+        end
+        f._subType:SetText(table.concat(stParts, "  "))
     end
     if entry.isGear then
         if db.showIlvl    and entry.ilvl     and entry.ilvl > 0     then subParts[#subParts+1] = "ilvl " .. entry.ilvl end
-        if db.showUpgradeTrack ~= false and entry.upgradeTrackTier then
-            local tier = math.min(entry.upgradeTrackTier, 5)
-            subParts[#subParts+1] = CreateAtlasMarkup("Professions-ChatIcon-Quality-Tier" .. tier, 16, 16)
-        end
         if db.showTertiary and entry.tertiary and #entry.tertiary > 0 then subParts[#subParts+1] = entry.tertiary end
         if db.showSockets  and entry.sockets  and #entry.sockets  > 0 then subParts[#subParts+1] = entry.sockets  end
     elseif entry.append and #entry.append > 0 then
-        subParts[#subParts+1] = entry.append
+        if entry.rarity ~= 6 or db.showInvCount then
+            subParts[#subParts+1] = entry.append
+        end
     end
     if db.showInvCount and not entry.playerName and entry.invCount and entry.invCount > 0 then
-        subParts[#subParts+1] = "|cffaaaaaa" .. entry.invCount .. " in bags|r"
+        subParts[#subParts+1] = "|cffaaaaaa" .. entry.invCount .. " owned|r"
     end
     f._sub:SetText(table.concat(subParts, "  "))
     local priceLines = _priceLines
@@ -743,7 +763,7 @@ local function PopulateRow(f, entry)
             and entry.link
             and rar >= minRar
             and tradeable
-            and not entry.playerName
+            and not entry.playerName  -- not a party loot row
         if shouldOffer then
             oBtn._offerLink = entry.link
             oBtn:SetSize(16, 13)
@@ -762,7 +782,7 @@ local function PopulateRow(f, entry)
 end
 
 local rows      = {}
-Feed._rows = rows
+Feed._rows = rows  -- expose for Options unlock reset
 local feedFrame = nil
 
 local function ResizeFeedFrame()
@@ -907,16 +927,8 @@ function Feed:AddEntry(entry)
     local pf = db.personalFilters
     if pf and pf.filterRarity and pf.filterRarity[rar] == false then return end
 
-    if db.wishlistEnabled then
-        if entry.link then
-            if entry.isGear then
-                if not LLF.Config:IsItemWishlisted(entry.link) then return end
-            elseif entry.itemCategory == "pet" or entry.itemCategory == "mount" then
-                if db.wishlistFilterMountsPets and not LLF.Config:IsItemWishlisted(entry.link) then return end
-            end
-        elseif not entry.link and db.wishlistFilterCurrency then
-            return
-        end
+    if not entry.isPreview and db.wishlistEnabled and entry.link then
+        if not LLF.Config:IsItemWishlisted(entry.link) then return end
     end
 
     local dur = (entry.source == 1) and LLF.Config:GetDuration("gold") or LLF.Config:GetDuration(rar)
@@ -933,6 +945,10 @@ function Feed:AddEntry(entry)
                 local newCount = (r.entry.count or 1) + (entry.count or 1)
                 if r.entry.isGear or r.entry.canAH == false then newCount = 1 end
                 r.entry.count = newCount
+                if entry.isGear and entry.ilvl and entry.ilvl > (r.entry.ilvl or 0) then
+                    r.entry.ilvl = entry.ilvl
+                    r.entry.upgradeTrackTier = entry.upgradeTrackTier
+                end
                 r.expiresAt   = GetTime() + dur
                 r.fadeStart   = nil
                 r.rowFrame:SetAlpha(1)
@@ -947,6 +963,13 @@ function Feed:AddEntry(entry)
     f:SetHeight(db.feedRowHeight or ROW_H)
     f:SetAlpha(1); f:Show()
     entry.count = entry.count or 1
+    if entry.isPreview and db.showAHPrice and entry.link and not entry.ahPrice then
+        local skipAH = (entry.canAH == false) or (not db.showJunkAH and (entry.rarity or 1) == 0)
+        if not skipAH then
+            local ahv = LLF.Price:GetAHValue(entry.link)
+            if ahv then entry.ahPrice = ahv end
+        end
+    end
     PopulateRow(f, entry)
 
     local record = { entry=entry, rowFrame=f, expiresAt=GetTime()+dur, fadeStart=nil }
@@ -956,6 +979,7 @@ function Feed:AddEntry(entry)
     if db.showAHPrice and entry.link and not entry.ahPrice then
         local skipAH = (entry.canAH == false)
             or (not db.showJunkAH and (entry.rarity or 1) == 0)
+            or entry.isPreview
         if not skipAH then
             C_Timer.After(0.05, function()
                 local ahv = LLF.Price:GetAHValue(entry.link)
@@ -965,16 +989,6 @@ function Feed:AddEntry(entry)
                 end
             end)
         end
-    end
-
-    if db.showInvCount and entry.link and not entry.playerName then
-        C_Timer.After(0.5, function()
-            if record.rowFrame:IsShown() then
-                local cnt = GetItemCount and GetItemCount(entry.link) or 0
-                record.entry.invCount = cnt
-                PopulateRow(record.rowFrame, record.entry)
-            end
-        end)
     end
 
     if db.soundEnabled then
@@ -1024,16 +1038,8 @@ function Feed:OnUpdate(_elapsed)
             if not filtered and db.blacklistEnabled and r.entry.link then
                 if LLF.Config:IsItemBlacklisted(r.entry.link) then filtered = true end
             end
-            if not filtered and db.wishlistEnabled then
-                if r.entry.link then
-                    if r.entry.isGear then
-                        if not LLF.Config:IsItemWishlisted(r.entry.link) then filtered = true end
-                    elseif r.entry.itemCategory == "pet" or r.entry.itemCategory == "mount" then
-                        if db.wishlistFilterMountsPets and not LLF.Config:IsItemWishlisted(r.entry.link) then filtered = true end
-                    end
-                elseif not r.entry.link and db.wishlistFilterCurrency then
-                    filtered = true
-                end
+            if not filtered and db.wishlistEnabled and r.entry.link then
+                if not LLF.Config:IsItemWishlisted(r.entry.link) then filtered = true end
             end
             if filtered then
                 if r.rowFrame:IsShown() then r.rowFrame:Hide(); dirty = true end
@@ -1115,11 +1121,10 @@ end
 
 function Feed:Preview()
     self:ClearAll()
-    Feed._previewSoundPlayed = false
     local samples = {
         { icon=135274,  name="Thunderfury, Blessed Blade", rarity=5, source=4, ilvl=650,  isGear=true,  price=987654,  ahPrice=12500000, canAH=true,  tertiary="|cFF00FFFFLeech|r", subType="One-Handed Sword", mergeKey="pv1", isPreview=true,
           link="|cffff8000|Hitem:19019::::::::60:::::|h[Thunderfury, Blessed Blade]|h|r" },
-        { icon=133765,  name="Thornwood Wristguards",        rarity=3, source=3, ilvl=285,  isGear=true,  price=1234,    isTransmog=true,  subType="Leather",            mergeKey="pv2", isPreview=true, upgradeTrackTier=2,
+        { icon=133765,  name="Thornwood Wristguards",        rarity=3, source=3, ilvl=285,  isGear=true,  price=1234,    isTransmog=true,  subType="Leather",            mergeKey="pv2", isPreview=true, upgradeTrackTier=2, craftingQuality=3,
           link="item:57232" },
         { icon=133784,  name="Money",                       rarity=1, source=1,            isGear=false, price=2345678,                                                  mergeKey="pv3", isPreview=true },
         { icon=463446,  name="Timewarped Badge",            rarity=6, source=2, count=40,  isGear=false, price=0,       append=" (2000)",                                mergeKey="pv4", isPreview=true },
@@ -1299,16 +1304,8 @@ function PFeed:AddEntry(entry)
     if gf and gf.filterRarity and gf.filterRarity[rar] == false then return end
     if rar < (pdf.filterMinRarity or 0) then return end
 
-    if db.wishlistEnabled and db.wishlistGroupLoot then
-        if entry.link then
-            if entry.isGear then
-                if not LLF.Config:IsItemWishlisted(entry.link) then return end
-            elseif entry.itemCategory == "pet" or entry.itemCategory == "mount" then
-                if db.wishlistFilterMountsPets and not LLF.Config:IsItemWishlisted(entry.link) then return end
-            end
-        elseif not entry.link and db.wishlistFilterCurrency then
-            return
-        end
+    if not entry.isPreview and db.wishlistEnabled and db.wishlistGroupLoot and entry.link then
+        if not LLF.Config:IsItemWishlisted(entry.link) then return end
     end
 
     local dur = LLF.Config:GetDuration(rar, "group")
@@ -1325,6 +1322,10 @@ function PFeed:AddEntry(entry)
                 local newCount = (r.entry.count or 1) + (entry.count or 1)
                 if r.entry.isGear or r.entry.canAH == false then newCount = 1 end
                 r.entry.count = newCount
+                if entry.isGear and entry.ilvl and entry.ilvl > (r.entry.ilvl or 0) then
+                    r.entry.ilvl = entry.ilvl
+                    r.entry.upgradeTrackTier = entry.upgradeTrackTier
+                end
                 r.expiresAt   = GetTime() + dur
                 r.fadeStart   = nil
                 r.rowFrame:SetAlpha(1)
@@ -1350,6 +1351,7 @@ function PFeed:AddEntry(entry)
     if db.showAHPrice and entry.link and not entry.ahPrice then
         local skipAH = (entry.canAH == false)
             or (not db.showJunkAH and (entry.rarity or 1) == 0)
+            or entry.isPreview
         if not skipAH then
             C_Timer.After(0.05, function()
                 local ahv = LLF.Price:GetAHValue(entry.link)
@@ -1385,16 +1387,8 @@ function PFeed:OnUpdate(_elapsed)
             if not filtered and db.blacklistEnabled and r.entry.link then
                 if LLF.Config:IsItemBlacklisted(r.entry.link) then filtered = true end
             end
-            if not filtered and db.wishlistEnabled and db.wishlistGroupLoot then
-                if r.entry.link then
-                    if r.entry.isGear then
-                        if not LLF.Config:IsItemWishlisted(r.entry.link) then filtered = true end
-                    elseif r.entry.itemCategory == "pet" or r.entry.itemCategory == "mount" then
-                        if db.wishlistFilterMountsPets and not LLF.Config:IsItemWishlisted(r.entry.link) then filtered = true end
-                    end
-                elseif not r.entry.link and db.wishlistFilterCurrency then
-                    filtered = true
-                end
+            if not filtered and db.wishlistEnabled and db.wishlistGroupLoot and r.entry.link then
+                if not LLF.Config:IsItemWishlisted(r.entry.link) then filtered = true end
             end
             if filtered then
                 if r.rowFrame:IsShown() then r.rowFrame:Hide(); dirty = true end
@@ -1482,7 +1476,7 @@ function PFeed:Preview()
           link="item:19364" },
         { icon=133784,  name="Money",                        rarity=1, source=1,           isGear=false, price=123456,                             playerName="Thalor",    mergeKey="ppv2", isPreview=true },
         { icon=463446,  name="Timewarped Badge",             rarity=6, source=2, count=15, isGear=false, price=0,      append=" (500)",            playerName="Frostfell", mergeKey="ppv3", isPreview=true },
-        { icon=133765,  name="Thornwood Wristguards",        rarity=3, source=3, ilvl=285, isGear=true,  price=1234,   subType="Leather",          playerName="Vaelos",    mergeKey="ppv4", isPreview=true, isTransmog=true, upgradeTrackTier=2,
+        { icon=133765,  name="Thornwood Wristguards",        rarity=3, source=3, ilvl=285, isGear=true,  price=1234,   subType="Leather",          playerName="Vaelos",    mergeKey="ppv4", isPreview=true, isTransmog=true, upgradeTrackTier=2, craftingQuality=3,
           link="item:57232" },
         { icon=4638563, name="Void-Touched Wristguard",      rarity=4, source=3, ilvl=639, isGear=true,  price=0,      subType="Plate",            playerName="Nightfall", mergeKey="ppv5", isPreview=true, isUpgrade=true, upgradeTrackTier=5,
           link="item:133632" },
@@ -1490,8 +1484,6 @@ function PFeed:Preview()
           link="item:32768" },
         { icon=656558,  name="Disgusting Oozeling",          rarity=3, source=4, count=1,  isGear=false, price=0,      subType="Pet",              playerName="Cinderfall", mergeKey="ppv7", isPreview=true, itemCategory="pet",
           link="item:20769" },
-        { icon=136243,  name="Test Whisper Item",            rarity=4, source=3, ilvl=398, isGear=true,  price=50000,  subType="Two-Handed Sword", playerName=UnitName("player"), playerNameFull=UnitName("player"), mergeKey="ppvWHISPER_SELF_TEST", isPreview=true, upgradeTrackTier=4,
-          link="item:19364" },
     }
     local ids = {}
     for _, item in ipairs(samples) do

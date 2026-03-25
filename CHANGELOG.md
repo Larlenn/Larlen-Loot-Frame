@@ -1,5 +1,16 @@
 # Larlen Loot Frame Changelog
 
+## v1.0.4
+- Fixed crafting/gathering quality icon display on loot rows
+- Added upgrade track tier display (Explorer/Adventurer/Veteran/Champion/Hero/Myth) on gear rows with toggle
+- Both quality icon and upgrade track tier shown on the same line as item subtype
+- Renamed "Show bag count" to "Show owned count" - now correctly reflects equipped items
+- Currency balance (e.g. Timewarped Badge count) hidden when "Show owned count" is off
+- "Show owned count" toggle now updates the feed live without needing test rows locked
+- Clear Test button now resets the Lock/Unlock button state correctly on both feeds
+- Lock Test no longer replays sound notifications
+- AH price no longer flickers when pressing Lock Test
+
 ## v1.0.3
 - Fixed wishlist sound section being clickable when wishlist filter is disabled
 - Fixed error spam from C_HousingCatalog API change requiring a second argument

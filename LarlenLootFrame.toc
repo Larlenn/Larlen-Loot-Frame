@@ -1,8 +1,8 @@
 ## Interface: 120001
-## Title: Larlen Loot Frame
+## Title: |cFF33BFFFLarlen|r Loot Frame
 ## Notes: Clean, lightweight loot feed inspired by the "Loot Frame" WeakAura. Supports Auctionator & TSM pricing. No bloat.
 ## Author: Larlen
-## Version: 1.0.3
+## Version: 1.0.4
 ## X-Curse-Project-ID: 1494468
 ## X-Wago-ID: 96ELZ2Ng
 ## SavedVariables: LarlenLootFrameDB
@@ -11,17 +11,17 @@
 ## X-Compartment: LarlenLootFrame_OnCompartmentClick
 ## X-Compartment-Icon: 136240
 ## X-Compartment-HoverText: Larlen Loot Frame
-## Category-enUS: Inventory
-## Category-deDE: Inventar
-## Category-esES: Inventario
-## Category-esMX: Inventario
-## Category-frFR: Inventaire
-## Category-itIT: Inventario
-## Category-koKR: 소지품
-## Category-ptBR: Inventário
-## Category-ruRU: Предметы
-## Category-zhCN: 物品栏
-## Category-zhTW: 物品欄
+## Category-enUS: |cFF33BFFFLarlen|r Productions
+## Category-deDE: |cFF33BFFFLarlen|r Productions
+## Category-esES: |cFF33BFFFLarlen|r Productions
+## Category-esMX: |cFF33BFFFLarlen|r Productions
+## Category-frFR: |cFF33BFFFLarlen|r Productions
+## Category-itIT: |cFF33BFFFLarlen|r Productions
+## Category-koKR: |cFF33BFFFLarlen|r Productions
+## Category-ptBR: |cFF33BFFFLarlen|r Productions
+## Category-ruRU: |cFF33BFFFLarlen|r Productions
+## Category-zhCN: |cFF33BFFFLarlen|r Productions
+## Category-zhTW: |cFF33BFFFLarlen|r Productions
 
 Libs\LibStub\LibStub.lua
 Libs\CallbackHandler-1.0\CallbackHandler-1.0.lua
