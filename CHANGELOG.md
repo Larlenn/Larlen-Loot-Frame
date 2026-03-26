@@ -1,5 +1,14 @@
 # Larlen Loot Frame Changelog
 
+## v1.0.7
+- Fixed gold gains showing in the feed even when Blizzard loot popups were disabled
+- Fixed quality icon showing incorrect colour for certain item tiers
+- Cleaned up gold value number formatting for better readability
+- Fixed Lua taint error when receiving honor (Core.lua:469 secret string)
+- Added enable/disable toggle for the personal loot feed independently of the group feed
+- Cleaned up Filters and Durations pages - removed inapplicable group loot options (currency, honor) that could never trigger
+- Improved wording and labelling clarity across Filters, Durations, and Price options pages
+
 ## v1.0.6
 - Price lines now use two fixed right-side rows: AH on top, vendor in middle when both are enabled
 - When vendor price is disabled, AH price now sits in the middle row for consistent alignment

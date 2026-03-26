@@ -4,6 +4,7 @@ local Config = LLF.Config
 
 Config.DEFAULTS = {
     enabled          = true,
+    personalEnabled  = true,
     feedX            = 350,
     feedY            = 300,
     feedWidth        = 400,
@@ -60,6 +61,7 @@ Config.DEFAULTS = {
     rowBorderSize  = 1,
     rowBorderColor = { 1, 1, 1, 1 },
     showRep          = true,
+    showGold         = true,
     showInvCount     = false,
     needMessage      = "{name}, do you need {item}?",
     offerEnabled     = true,

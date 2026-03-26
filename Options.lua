@@ -966,6 +966,19 @@ end
 local function PageLayout(parent, CW)
     local p = MakePage(parent, CW)
 
+    p.Header("Personal Loot Feed")
+    p.Row("Enable personal loot feed",
+        function() return LLF.db.personalEnabled ~= false end,
+        function(v)
+            LLF.db.personalEnabled = v
+            if not v then
+                LLF.Feed:ClearAll()
+            else
+                LLF.Feed:Refresh()
+                if LLF.Feed.testLocked then LLF.Feed:Preview() end
+            end
+        end)
+
     p.Header("Growth Direction")
     p.Sep(2)
     p.Label("New entries appear:")
@@ -1250,9 +1263,16 @@ local function PageDurations(parent, CW)
 
     p.Sep(12)
 
+    local RAR_GROUP = {
+        { 0, "|cff9d9d9dPoor|r" },               { 1, "|cffffffffCommon|r"           },
+        { 2, "|cff1eff00Uncommon|r" },            { 3, "|cff0070ddRare|r"             },
+        { 4, "|cffa335eeEpic|r" },                { 5, "|cffff8000Legendary|r"        },
+        { 7, "|cff00ccffQuest / Heirloom|r" },
+    }
+
     p.Header("Group Loot - Display Duration")
-    for i = 1, #RAR, 2 do
-        local L, R = RAR[i], RAR[i + 1]
+    for i = 1, #RAR_GROUP, 2 do
+        local L, R = RAR_GROUP[i], RAR_GROUP[i + 1]
         p.SlideInputL(L[2], 0, 60, 0.5,
             function() return LLF.db.groupDurations[L[1]] or 0 end,
             function(v) LLF.db.groupDurations[L[1]] = v end, " sec")
@@ -1264,13 +1284,6 @@ local function PageDurations(parent, CW)
             p.SetY(p.GetY() - 44 - SEP)
         end
     end
-    p.SlideInputL("|cffffff00Gold|r", 0, 60, 0.5,
-        function() return LLF.db.groupDurations.gold or 5 end,
-        function(v) LLF.db.groupDurations.gold = v end, " sec")
-    p.SlideInputR("|cffcc2222Honor|r", 0, 60, 0.5,
-        function() return LLF.db.groupDurations[8] or 5 end,
-        function(v) LLF.db.groupDurations[8] = v end, " sec")
-    p.SetY(p.GetY() - 44 - SEP)
 
     p.Finalize()
 end
@@ -1308,7 +1321,7 @@ local function PagePrice(parent, CW)
                 { value = 4, display = "Short + g  (1.3kg  /  2.5Mg)" },
             }
         end)
-    p.Picker("Price prefixes", 24,
+    p.Picker("Price labels", 24,
         function() return LLF.db.pricePrefixMode or 4 end,
         function(v)
             LLF.db.pricePrefixMode = v
@@ -1316,10 +1329,10 @@ local function PagePrice(parent, CW)
         end,
         function()
             return {
-                { value = 1, display = "None" },
-                { value = 2, display = "AH only" },
-                { value = 3, display = "Vendor only" },
-                { value = 4, display = "AH + Vendor" },
+                { value = 1, display = "No label" },
+                { value = 2, display = "AH label only" },
+                { value = 3, display = "Vendor label only" },
+                { value = 4, display = "AH + Vendor labels" },
             }
         end)
 
@@ -1621,10 +1634,12 @@ local function PageFilters(parent, CW)
     p.RowL("|cffcc2222Honor|r",
         function() return LLF.db.personalFilters.filterRarity[8] ~= false end,
         function(v) LLF.db.personalFilters.filterRarity[8] = v end)
-    p.SetY(p.GetY() - ROW_H - SEP)
+    p.RowR("|cffffff00Gold|r",
+        function() return LLF.db.showGold ~= false end,
+        function(v) LLF.db.showGold = v end)
 
     p.Header("|cff55ff55Personal Loot|r - Reputation")
-    p.RowL("Show reputation gains",
+    p.RowL("Show personal reputation",
         function() return LLF.db.personalFilters.filterRep ~= false end,
         function(v)
             LLF.db.personalFilters.filterRep = v
@@ -1652,9 +1667,16 @@ local function PageFilters(parent, CW)
 
     p.Sep(20)
 
+    local RFILT_GROUP = {
+        { 0, "|cff9d9d9dPoor|r" },               { 1, "|cffffffffCommon|r"           },
+        { 2, "|cff1eff00Uncommon|r" },            { 3, "|cff0070ddRare|r"             },
+        { 4, "|cffa335eeEpic|r" },                { 5, "|cffff8000Legendary|r"        },
+        { 7, "|cff00ccffQuest / Heirloom|r" },
+    }
+
     p.Header("|cff55bbffGroup Loot|r - Rarity")
-    for i = 1, #RFILT, 2 do
-        local L, R = RFILT[i], RFILT[i + 1]
+    for i = 1, #RFILT_GROUP, 2 do
+        local L, R = RFILT_GROUP[i], RFILT_GROUP[i + 1]
         p.RowL(L[2],
             function() return LLF.db.groupFilters.filterRarity[L[1]] ~= false end,
             function(v) LLF.db.groupFilters.filterRarity[L[1]] = v end)
@@ -1666,10 +1688,6 @@ local function PageFilters(parent, CW)
             p.SetY(p.GetY() - ROW_H - SEP)
         end
     end
-    p.RowL("|cffcc2222Honor|r",
-        function() return LLF.db.groupFilters.filterRarity[8] ~= false end,
-        function(v) LLF.db.groupFilters.filterRarity[8] = v end)
-    p.SetY(p.GetY() - ROW_H - SEP)
 
     p.Finalize()
 end
@@ -1680,7 +1698,7 @@ local function PagePartyFeed(parent, CW)
     local function pdf() return LLF.db.partyFeed end
 
     p.Header("Group Loot Feed")
-    p.Row("Enable party loot feed",
+    p.Row("Enable group loot feed",
         function() return pdf().enabled end,
         function(v) pdf().enabled = v
             if not v then LLF.PartyFeed:ClearAll() else LLF.PartyFeed:Refresh() end

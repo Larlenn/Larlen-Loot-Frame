@@ -43,10 +43,17 @@ end
 local function FormatShort(copper, suffix)
     local g = copper / 10000
     local su = suffix or ""
+    local function OneDecimalTrimmed(v)
+        local n = math.floor(v * 10 + 0.5) / 10
+        if n == math.floor(n) then
+            return tostring(math.floor(n))
+        end
+        return string.format("%.1f", n)
+    end
     if g >= 1000000 then
-        return "|cffffff00" .. string.format("%.1fM", g / 1000000) .. su .. "|r"
+        return "|cffffff00" .. OneDecimalTrimmed(g / 1000000) .. "M" .. su .. "|r"
     elseif g >= 1000 then
-        return "|cffffff00" .. string.format("%.1fk", g / 1000) .. su .. "|r"
+        return "|cffffff00" .. OneDecimalTrimmed(g / 1000) .. "k" .. su .. "|r"
     elseif g >= 1 then
         return "|cffffff00" .. math.floor(g) .. su .. "|r"
     end

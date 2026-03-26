@@ -211,6 +211,29 @@ local function GetCraftingQuality(link, itemID)
     return nil
 end
 
+local function GetCraftingQualityAtlas(link, itemID)
+    local t = C_TradeSkillUI
+    if type(t) ~= "table" then return nil end
+    local function fromInfo(info)
+        if type(info) == "table" then
+            if type(info.iconChat) == "string" and info.iconChat ~= "" then return info.iconChat end
+            if type(info.icon) == "string" and info.icon ~= "" then return info.icon end
+        end
+        return nil
+    end
+    if type(t.GetItemReagentQualityInfo) == "function" then
+        local ok, info = pcall(t.GetItemReagentQualityInfo, link)
+        local atlas = ok and fromInfo(info) or nil
+        if atlas then return atlas end
+        if itemID then
+            ok, info = pcall(t.GetItemReagentQualityInfo, itemID)
+            atlas = ok and fromInfo(info) or nil
+            if atlas then return atlas end
+        end
+    end
+    return nil
+end
+
 local _upgradePattern
 local function GetUpgradeTrackTier(link)
     if not link then return nil end
@@ -259,6 +282,7 @@ local function EntryFromLink(link, count, source)
     local trackTier = isGear and GetUpgradeTrackTier(link) or nil
 
     local craftingQuality = GetCraftingQuality(link, tonumber(itemID))
+    local craftingQualityAtlas = GetCraftingQualityAtlas(link, tonumber(itemID))
 
     return {
         icon     = icon,
@@ -279,6 +303,7 @@ local function EntryFromLink(link, count, source)
         itemCategory = category,
         upgradeTrackTier = trackTier,
         craftingQuality  = craftingQuality,
+        craftingQualityAtlas = craftingQualityAtlas,
     }
 end
 
@@ -327,6 +352,7 @@ local function HandleMoney()
     local delta = current - lastMoney
     lastMoney = current
     if delta <= 0 then return end
+    if LLF.db and LLF.db.showGold == false then return end
     if LLF.Config:GetDuration("gold") <= 0 then return end
     local icon = delta >= 10000 and 133784 or delta >= 100 and 133786 or 133788
     LLF.Feed:AddEntry({ icon=icon, name="Money", rarity=1, source=1, count=1, price=delta, mergeKey="money" })
@@ -427,6 +453,9 @@ local function HandleHonor(msg)
     if LLF.Config:GetDuration(8) <= 0 then return end
     local pf = LLF.db.personalFilters
     if pf and pf.filterRarity and pf.filterRarity[8] == false then return end
+    local ok, clean = pcall(tostring, msg)
+    if not ok or not clean then return end
+    msg = clean
     local gained = tonumber(msg:match("awarded (%d+) honor")) or
                    tonumber(msg:match("Estimated Honor Points: (%d+)")) or 0
     if gained <= 0 then return end
@@ -495,12 +524,24 @@ local lootSuppressHooked      = false
 local lootFrameHooksSetup     = false
 local transmogSuppressHooked  = false
 
+local function IsSuppressibleDefaultAlert(frame)
+    if not frame then return false end
+    if frame.lootItem then return true end
+    local name = frame.GetName and frame:GetName()
+    if type(name) == "string" then
+        if name:find("MoneyWonAlertFrame", 1, true) then return true end
+        if name:find("LootWonAlertFrame", 1, true) then return true end
+    end
+    if frame.money and frame.gold and frame.silver and frame.copper then return true end
+    return false
+end
+
 local function HideActiveLootAlerts()
     if not AlertFrame then return end
     local n = AlertFrame:GetNumChildren()
     for i = 1, n do
         local child = select(i, AlertFrame:GetChildren())
-        if child and child.lootItem then
+        if IsSuppressibleDefaultAlert(child) then
             if AlertFrame.RemoveAlertFrame then
                 AlertFrame:RemoveAlertFrame(child)
             end
@@ -540,7 +581,7 @@ local function SetupLootSuppressionFrameHooks()
     hooksecurefunc(AlertFrame, "AddAlertFrame", function(_, frame)
         if not frame then return end
         if not (LLF.db and LLF.db.suppressDefaultLoot) then return end
-        if frame.lootItem then
+        if IsSuppressibleDefaultAlert(frame) then
             C_Timer.After(0, function()
                 if AlertFrame.RemoveAlertFrame then
                     AlertFrame:RemoveAlertFrame(frame)
@@ -611,7 +652,7 @@ eventFrame:SetScript("OnEvent", function(_, event, ...)
         end
         lastMoney = GetMoney()
         SetupLootSuppression()
-        print("|cff32bff7Larlen Loot Frame|r v" .. LLF.VERSION .. " loaded.  /llf for options.")
+        print("|cff32bff7Larlen Loot Frame|r v" .. LLF.VERSION .. " loaded.  |cffffff00/llf|r for options.")
 
     elseif event == "PLAYER_LOGIN" then
         LLF.Minimap:ApplyVisibility()
@@ -620,6 +661,9 @@ eventFrame:SetScript("OnEvent", function(_, event, ...)
 
     elseif event == "PLAYER_MONEY" then
         HandleMoney()
+        if LLF.db and LLF.db.suppressDefaultLoot then
+            C_Timer.After(0, HideActiveLootAlerts)
+        end
 
     elseif event == "CHAT_MSG_LOOT" then
         local a1, a2, a3, a4, a5 = ...

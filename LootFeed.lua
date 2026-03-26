@@ -790,8 +790,13 @@ local function PopulateRow(f, entry)
             if txt then stParts[#stParts+1] = txt end
         end
         if db.showCraftingQuality ~= false and entry.craftingQuality and entry.craftingQuality > 0 then
-            local t = math.min(entry.craftingQuality, 5)
-            stParts[#stParts+1] = CreateAtlasMarkup("Professions-ChatIcon-Quality-Tier" .. t, 16, 16)
+            local atlas = entry.craftingQualityAtlas
+            if type(atlas) == "string" and atlas ~= "" then
+                stParts[#stParts+1] = CreateAtlasMarkup(atlas, 16, 16)
+            else
+                local t = math.min(entry.craftingQuality, 5)
+                stParts[#stParts+1] = CreateAtlasMarkup("Professions-ChatIcon-Quality-Tier" .. t, 16, 16)
+            end
         end
         f._subType:SetText(table.concat(stParts, "  "))
     end
@@ -1016,6 +1021,7 @@ end
 function Feed:AddEntry(entry)
     local db = LLF.db
     if not db or not db.enabled then return end
+    if db.personalEnabled == false then return end
     if not feedFrame then self:Init() end
 
     local rar = entry.rarity or 1
