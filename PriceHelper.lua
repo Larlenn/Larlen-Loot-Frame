@@ -98,7 +98,7 @@ function Price:GetAHValue(link)
         return (ok and type(val) == "number" and val > 0) and val or nil
 
     elseif addon == 2 then
-        local id = cleanLink:match("item:(%d+)")
+        local id = string.match(cleanLink, "item:(%d+)")
         if not id then return nil end
         local key = (db.tsmSource == 2) and "dbminbuyout" or "dbmarket"
         local ok, val = pcall(function()

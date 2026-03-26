@@ -1,5 +1,8 @@
 # Larlen Loot Frame Changelog
 
+## v1.0.9
+- Fixed Lua taint errors comprehensively across all files - all string method calls on event-sourced strings replaced with safe global equivalents across Core.lua, Config.lua, and PriceHelper.lua
+
 ## v1.0.8
 - Fixed Lua taint error in reputation handler (Core.lua:498) - same root cause as the honor fix in 1.0.7, now resolved in both handlers
 

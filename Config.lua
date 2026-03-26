@@ -342,7 +342,7 @@ function Config:InitBlacklist()
             local migrated = {}
             for _, e in ipairs(bl) do
                 if e.type == 1 and e.link then
-                    local itemID = tonumber(e.link:match("item:(%d+)"))
+                    local itemID = tonumber(string.match(e.link, "item:(%d+)"))
                     if itemID then
                         local name, _, rarity, _, _, _, _, _, _, icon = C_Item.GetItemInfo(itemID)
                         migrated[itemID] = { name = name or e.link, icon = icon, rarity = rarity, link = e.link }
@@ -358,7 +358,7 @@ end
 
 function Config:IsItemBlacklisted(link)
     if not link then return false end
-    local itemID = tonumber(link:match("item:(%d+)"))
+    local itemID = tonumber(string.match(link, "item:(%d+)"))
     if itemID and LLF.db.blacklist and LLF.db.blacklist[itemID] then
         return true
     end
@@ -367,7 +367,7 @@ end
 
 function Config:AddItemToBlacklist(link)
     if not link then return false end
-    local itemID = tonumber(link:match("item:(%d+)"))
+    local itemID = tonumber(string.match(link, "item:(%d+)"))
     if not itemID then return false end
     if LLF.db.blacklist[itemID] then return false end
     local name, _, rarity, _, _, _, _, _, _, icon = C_Item.GetItemInfo(link)
@@ -381,7 +381,7 @@ end
 
 function Config:IsItemWishlisted(link)
     if not link then return false end
-    local itemID = tonumber(link:match("item:(%d+)"))
+    local itemID = tonumber(string.match(link, "item:(%d+)"))
     if itemID and LLF.db.wishlist and LLF.db.wishlist[itemID] then
         return true
     end
@@ -390,7 +390,7 @@ end
 
 function Config:AddItemToWishlist(link)
     if not link then return false end
-    local itemID = tonumber(link:match("item:(%d+)"))
+    local itemID = tonumber(string.match(link, "item:(%d+)"))
     if not itemID then return false end
     if LLF.db.wishlist[itemID] then return false end
     local name, _, rarity, _, _, _, _, _, _, icon = C_Item.GetItemInfo(link)

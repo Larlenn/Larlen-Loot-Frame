@@ -135,7 +135,7 @@ local function GetItemCategory(link, classID, subClassID)
     if classID == 15 and subClassID == 5 then return "mount" end
     if classID == 15 and subClassID == 2 then return "pet" end
     if C_HousingCatalog and C_HousingCatalog.GetCatalogEntryInfoByItem then
-        local itemID = tonumber(link:match("item:(%d+)"))
+        local itemID = tonumber(string.match(link, "item:(%d+)"))
         if itemID and C_HousingCatalog.GetCatalogEntryInfoByItem(itemID, false) then return "housing" end
     end
     return nil
@@ -159,7 +159,7 @@ local function GetCraftingQuality(link, itemID)
     if type(t) ~= "table" then return nil end
     local itemStr = link
     if type(itemStr) == "string" then
-        local s = itemStr:match("|H(item:[^|]+)|h")
+        local s = string.match(itemStr, "|H(item:[^|]+)|h")
         if s then itemStr = s end
     end
     local function pick(a, b)
@@ -276,7 +276,7 @@ local function EntryFromLink(link, count, source)
     local ilvl              = isGear and C_Item.GetDetailedItemLevelInfo(link) or nil
     local sockets, tertiary = ParseItemStats(link)
     local canAH = (bindType ~= 1 and bindType ~= 4)
-    local itemID = link:match("item:(%d+)") or link
+    local itemID = string.match(link, "item:(%d+)") or link
 
     local displaySubType = CATEGORY_LABELS[category] or (isGear and itemSubType or nil)
     local trackTier = isGear and GetUpgradeTrackTier(link) or nil
@@ -363,18 +363,18 @@ local lastLootEventAt = 0
 
 local function HandleChatMsgLoot(msg, _, _, _, sender)
     local receiver = type(sender) == "string" and (sender .. "") or ""
-    local dash = receiver:find("-", 1, true)
-    if dash then receiver = receiver:sub(1, dash - 1) end
+    local dash = string.find(receiver, "-", 1, true)
+    if dash then receiver = string.sub(receiver, 1, dash - 1) end
 
-    local isMe = msg:match("^You receive") ~= nil
-              or msg:match(" was changed to ") ~= nil
+    local isMe = string.match(msg, "^You receive") ~= nil
+              or string.match(msg, " was changed to ") ~= nil
               or (receiver ~= "" and receiver == UnitName("player"))
 
     if not isMe then
         local pdf = LLF.db and LLF.db.partyFeed
         if pdf and pdf.enabled then
             if receiver == "" then
-                local parsed = msg:match("^([^%s]+) receives ")
+                local parsed = string.match(msg, "^([^%s]+) receives ")
                 if parsed then receiver = parsed end
             end
             if receiver ~= "" and IsGroupMember(receiver) then
@@ -383,10 +383,10 @@ local function HandleChatMsgLoot(msg, _, _, _, sender)
                 if (inParty and pdf.showParty) or (inRaid and pdf.showRaid) then
                     if (GetTime() - lastLootEventAt) > 5 then return end
                     local link
-                    for m in msg:gmatch("(|c%x%x%x%x%x%x%x%x|Hitem:.-|h%[.-%]|h|r)") do link = m end
-                    if not link then link = msg:match("(|Hitem:.-|h%[.-%]|h)") end
+                    for m in string.gmatch(msg, "(|c%x%x%x%x%x%x%x%x|Hitem:.-|h%[.-%]|h|r)") do link = m end
+                    if not link then link = string.match(msg, "(|Hitem:.-|h%[.-%]|h)") end
                     if link then
-                        local entry = EntryFromLink(link, tonumber(msg:match("x(%d+)%s*$")) or 1, 4)
+                        local entry = EntryFromLink(link, tonumber(string.match(msg, "x(%d+)%s*$")) or 1, 4)
                         if entry and not ShouldFilterCategory(entry.itemCategory, true) then
                             entry.playerName     = receiver
                             entry.playerNameFull = tostring(sender)
@@ -401,12 +401,12 @@ local function HandleChatMsgLoot(msg, _, _, _, sender)
     end
 
     local link
-    for m in msg:gmatch("(|c%x%x%x%x%x%x%x%x|Hitem:.-|h%[.-%]|h|r)") do link = m end
-    if not link then link = msg:match("(|Hitem:.-|h%[.-%]|h)") end
+    for m in string.gmatch(msg, "(|c%x%x%x%x%x%x%x%x|Hitem:.-|h%[.-%]|h|r)") do link = m end
+    if not link then link = string.match(msg, "(|Hitem:.-|h%[.-%]|h)") end
     if not link then return end
-    local itemID = link:match("item:(%d+)") or link
+    local itemID = string.match(link, "item:(%d+)") or link
     if recentLoot[itemID] then return end
-    local entry = EntryFromLink(link, tonumber(msg:match("x(%d+)%s*$")) or 1, 4)
+    local entry = EntryFromLink(link, tonumber(string.match(msg, "x(%d+)%s*$")) or 1, 4)
     if entry and not ShouldFilterCategory(entry.itemCategory, false) then LLF.Feed:AddEntry(entry) end
 end
 
@@ -415,7 +415,7 @@ local function HandleEncounterLoot(_, _, link, count, playerName)
     lastLootEventAt = GetTime()
     local isMe = (playerName == UnitName("player"))
     if not isMe then return end
-    local itemID = link:match("item:(%d+)") or link
+    local itemID = string.match(link, "item:(%d+)") or link
     recentLoot[itemID] = true
     C_Timer.After(1, function() recentLoot[itemID] = nil end)
     local entry = EntryFromLink(link, tonumber(count) or 1, 3)
@@ -423,13 +423,13 @@ local function HandleEncounterLoot(_, _, link, count, playerName)
 end
 
 local function HandleCurrency(msg)
-    local cLink = msg:match("(|c%x%x%x%x%x%x%x%x|Hcurrency:%d+|h%[.-%]|h|r)")
+    local cLink = string.match(msg, "(|c%x%x%x%x%x%x%x%x|Hcurrency:%d+|h%[.-%]|h|r)")
     if not cLink then return end
     local info = C_CurrencyInfo.GetCurrencyInfoFromLink(cLink)
     if not info then return end
     if LLF.Config:IsCurrencyBlacklisted(info.currencyID or 0) then return end
     if LLF.Config:GetDuration(6) <= 0 then return end
-    local count  = tonumber(msg:match("x(%d+)%s*$")) or 1
+    local count  = tonumber(string.match(msg, "x(%d+)%s*$")) or 1
     local append = ""
     if info.quantity then
         local cur, cap = info.quantity, info.maxQuantity
