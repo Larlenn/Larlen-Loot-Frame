@@ -1308,6 +1308,20 @@ local function PagePrice(parent, CW)
                 { value = 4, display = "Short + g  (1.3kg  /  2.5Mg)" },
             }
         end)
+    p.Picker("Price prefixes", 24,
+        function() return LLF.db.pricePrefixMode or 4 end,
+        function(v)
+            LLF.db.pricePrefixMode = v
+            RefreshTest()
+        end,
+        function()
+            return {
+                { value = 1, display = "None" },
+                { value = 2, display = "AH only" },
+                { value = 3, display = "Vendor only" },
+                { value = 4, display = "AH + Vendor" },
+            }
+        end)
 
     p.Header("AH Price Source")
     do

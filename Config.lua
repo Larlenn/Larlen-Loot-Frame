@@ -37,6 +37,7 @@ Config.DEFAULTS = {
     tsmSource        = 1,
     showStackPrice   = true,
     showJunkAH       = true,
+    pricePrefixMode  = 4,
     showCopperSilver = true,
     priceFormat      = 1,
     showIlvl         = true,

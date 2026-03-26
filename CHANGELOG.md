@@ -1,5 +1,11 @@
 # Larlen Loot Frame Changelog
 
+## v1.0.6
+- Price lines now use two fixed right-side rows: AH on top, vendor in middle when both are enabled
+- When vendor price is disabled, AH price now sits in the middle row for consistent alignment
+- Added "Price prefixes" option with four modes: None, AH only, Vendor only, AH + Vendor
+- Added vendor prefix support with its own colour styling
+
 ## v1.0.5
 - Added customisable row border - pick any LibSharedMedia border texture, size, and color
 

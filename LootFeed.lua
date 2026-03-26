@@ -136,7 +136,6 @@ local LCG = LibStub and LibStub("LibCustomGlow-1.0", true)
 
 local _subParts   = {}
 local _stParts    = {}
-local _priceLines = {}
 local _glowColor  = { 1, 1, 1, 0.9 }
 local _wlColor    = { 1, 0.84, 0, 1 }
 
@@ -358,12 +357,19 @@ local function AcquireRow(parent)
     priceBox:SetWidth(124)
     f._priceBox = priceBox
 
-    local priceFS = priceBox:CreateFontString(nil, "OVERLAY")
-    priceFS:SetAllPoints(priceBox)
-    priceFS:SetJustifyH("RIGHT")
-    priceFS:SetJustifyV("MIDDLE")
-    priceFS:SetWordWrap(false)
-    f._price = priceFS
+    local priceTopFS = priceBox:CreateFontString(nil, "OVERLAY")
+    priceTopFS:SetPoint("TOPRIGHT", priceBox, "TOPRIGHT", 0, -2)
+    priceTopFS:SetJustifyH("RIGHT")
+    priceTopFS:SetJustifyV("TOP")
+    priceTopFS:SetWordWrap(false)
+    f._priceTop = priceTopFS
+
+    local priceMidFS = priceBox:CreateFontString(nil, "OVERLAY")
+    priceMidFS:SetPoint("RIGHT", priceBox, "RIGHT", 0, 0)
+    priceMidFS:SetJustifyH("RIGHT")
+    priceMidFS:SetJustifyV("MIDDLE")
+    priceMidFS:SetWordWrap(false)
+    f._priceMid = priceMidFS
 
     icon:EnableMouse(true)
     icon:SetScript("OnEnter", function(self)
@@ -663,7 +669,8 @@ local function PopulateRow(f, entry)
     f._name:SetFont(fp,  nameSz,  "")
     f._subType:SetFont(fp, subTypeSz, "")
     f._sub:SetFont(fp,   subSz,   "")
-    f._price:SetFont(fp, priceSz, "")
+    f._priceTop:SetFont(fp, priceSz, "")
+    f._priceMid:SetFont(fp, priceSz, "")
 
     f._name:ClearAllPoints()
     f._name:SetPoint("TOPLEFT",  f._iconFrame, "TOPRIGHT",  6, -2)
@@ -801,16 +808,33 @@ local function PopulateRow(f, entry)
         subParts[#subParts+1] = "|cffaaaaaa" .. entry.invCount .. " owned|r"
     end
     f._sub:SetText(table.concat(subParts, "  "))
-    local priceLines = _priceLines
-    wipe(priceLines)
+    local prefixMode = db.pricePrefixMode or 4
+    local ahPrefix = ""
+    local vendorPrefix = ""
+    if prefixMode == 2 or prefixMode == 4 then
+        ahPrefix = "|cff32bff7AH:|r "
+    end
+    if prefixMode == 3 or prefixMode == 4 then
+        vendorPrefix = "|cff8fe36bV:|r "
+    end
+    local ahText, vendorText = "", ""
     if db.showAHPrice and entry.ahPrice and entry.ahPrice > 0 then
-        priceLines[#priceLines+1] = "|cff32bff7AH: " .. LLF.Price:FormatAuto(entry.ahPrice * count) .. "|r"
+        ahText = ahPrefix .. "|cff32bff7" .. LLF.Price:FormatAuto(entry.ahPrice * count) .. "|r"
     end
     if db.showVendorPrice and entry.price and entry.price > 0 then
         local venAmt = db.showStackPrice and (entry.price * count) or entry.price
-        priceLines[#priceLines+1] = "|cffffff00" .. LLF.Price:FormatAuto(venAmt) .. "|r"
+        vendorText = vendorPrefix .. "|cffffff00" .. LLF.Price:FormatAuto(venAmt) .. "|r"
     end
-    f._price:SetText(table.concat(priceLines, "\n"))
+    if ahText ~= "" and vendorText ~= "" then
+        f._priceTop:SetText(ahText)
+        f._priceMid:SetText(vendorText)
+    elseif ahText ~= "" then
+        f._priceTop:SetText("")
+        f._priceMid:SetText(ahText)
+    else
+        f._priceTop:SetText("")
+        f._priceMid:SetText(vendorText)
+    end
 
     local target  = entry.playerNameFull or entry.playerName
     local display = entry.playerName
