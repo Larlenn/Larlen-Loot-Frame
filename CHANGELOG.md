@@ -1,5 +1,8 @@
 # Larlen Loot Frame Changelog
 
+## v1.0.8
+- Fixed Lua taint error in reputation handler (Core.lua:498) - same root cause as the honor fix in 1.0.7, now resolved in both handlers
+
 ## v1.0.7
 - Fixed gold gains showing in the feed even when Blizzard loot popups were disabled
 - Fixed quality icon showing incorrect colour for certain item tiers

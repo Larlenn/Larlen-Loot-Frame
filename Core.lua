@@ -456,8 +456,8 @@ local function HandleHonor(msg)
     local ok, clean = pcall(tostring, msg)
     if not ok or not clean then return end
     msg = clean
-    local gained = tonumber(msg:match("awarded (%d+) honor")) or
-                   tonumber(msg:match("Estimated Honor Points: (%d+)")) or 0
+    local gained = tonumber(string.match(msg, "awarded (%d+) honor")) or
+                   tonumber(string.match(msg, "Estimated Honor Points: (%d+)")) or 0
     if gained <= 0 then return end
     honorAccum = honorAccum + gained
     if honorTimer then honorTimer:Cancel() end
@@ -495,7 +495,7 @@ local function HandleRepChange(msg)
     if not ok or not clean then return end
     msg = clean
     local pat     = REP_PATTERNS[GetLocale()] or REP_PATTERNS["enUS"]
-    local faction = msg:match(pat.incName) or msg:match(pat.decName) or ""
+    local faction = string.match(msg, pat.incName) or string.match(msg, pat.decName) or ""
     if #faction == 0 then return end
     if LLF.Config:IsRepBlacklisted(faction) then return end
     if not pf.filterGuildRep then
@@ -503,8 +503,8 @@ local function HandleRepChange(msg)
         local guildName = GetGuildInfo("player")
         if guildName and faction == guildName then return end
     end
-    local gained = tonumber(msg:match(pat.incVal)) or 0
-    local lost   = tonumber(msg:match(pat.decVal)) or 0
+    local gained = tonumber(string.match(msg, pat.incVal)) or 0
+    local lost   = tonumber(string.match(msg, pat.decVal)) or 0
     LLF.Feed:AddEntry({
         icon=236681, name=faction .. " Rep", rarity=7, source=5,
         count=(gained > 0 and gained or -lost), price=0,
