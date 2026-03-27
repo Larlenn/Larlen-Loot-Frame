@@ -361,8 +361,21 @@ end
 local recentLoot = {}
 local lastLootEventAt = 0
 
+local hasIsSecretValue = type(issecretvalue) == "function"
+
+local function SafeString(value)
+    if type(value) ~= "string" then return "" end
+    if hasIsSecretValue and issecretvalue(value) then return "" end
+    local ok, clean = pcall(tostring, value)
+    if not ok or type(clean) ~= "string" then return "" end
+    return clean
+end
+
 local function HandleChatMsgLoot(msg, _, _, _, sender)
-    local receiver = type(sender) == "string" and (sender .. "") or ""
+    msg = SafeString(msg)
+    if msg == "" then return end
+    sender = SafeString(sender)
+    local receiver = sender
     local dash = string.find(receiver, "-", 1, true)
     if dash then receiver = string.sub(receiver, 1, dash - 1) end
 
@@ -389,7 +402,7 @@ local function HandleChatMsgLoot(msg, _, _, _, sender)
                         local entry = EntryFromLink(link, tonumber(string.match(msg, "x(%d+)%s*$")) or 1, 4)
                         if entry and not ShouldFilterCategory(entry.itemCategory, true) then
                             entry.playerName     = receiver
-                            entry.playerNameFull = tostring(sender)
+                            entry.playerNameFull = sender
                             entry.mergeKey       = "party_chat:" .. receiver .. ":" .. entry.mergeKey
                             LLF.PartyFeed:AddEntry(entry)
                         end
@@ -411,7 +424,10 @@ local function HandleChatMsgLoot(msg, _, _, _, sender)
 end
 
 local function HandleEncounterLoot(_, _, link, count, playerName)
-    if not link then return end
+    link = SafeString(link)
+    if link == "" then return end
+    playerName = SafeString(playerName)
+    if playerName == "" then return end
     lastLootEventAt = GetTime()
     local isMe = (playerName == UnitName("player"))
     if not isMe then return end
@@ -423,6 +439,8 @@ local function HandleEncounterLoot(_, _, link, count, playerName)
 end
 
 local function HandleCurrency(msg)
+    msg = SafeString(msg)
+    if msg == "" then return end
     local cLink = string.match(msg, "(|c%x%x%x%x%x%x%x%x|Hcurrency:%d+|h%[.-%]|h|r)")
     if not cLink then return end
     local info = C_CurrencyInfo.GetCurrencyInfoFromLink(cLink)
@@ -450,12 +468,11 @@ local honorAccum = 0
 local honorTimer = nil
 
 local function HandleHonor(msg)
+    msg = SafeString(msg)
+    if msg == "" then return end
     if LLF.Config:GetDuration(8) <= 0 then return end
     local pf = LLF.db.personalFilters
     if pf and pf.filterRarity and pf.filterRarity[8] == false then return end
-    local ok, clean = pcall(tostring, msg)
-    if not ok or not clean then return end
-    msg = clean
     local gained = tonumber(string.match(msg, "awarded (%d+) honor")) or
                    tonumber(string.match(msg, "Estimated Honor Points: (%d+)")) or 0
     if gained <= 0 then return end
@@ -488,12 +505,11 @@ local REP_PATTERNS = {
 }
 
 local function HandleRepChange(msg)
+    msg = SafeString(msg)
+    if msg == "" then return end
     local pf = LLF.db.personalFilters
     if not pf or not pf.filterRep then return end
     if LLF.Config:GetDuration("rep") <= 0 then return end
-    local ok, clean = pcall(tostring, msg)
-    if not ok or not clean then return end
-    msg = clean
     local pat     = REP_PATTERNS[GetLocale()] or REP_PATTERNS["enUS"]
     local faction = string.match(msg, pat.incName) or string.match(msg, pat.decName) or ""
     if #faction == 0 then return end
@@ -667,6 +683,8 @@ eventFrame:SetScript("OnEvent", function(_, event, ...)
 
     elseif event == "CHAT_MSG_LOOT" then
         local a1, a2, a3, a4, a5 = ...
+        a1 = SafeString(a1)
+        a5 = SafeString(a5)
         C_Timer.After(0, function() HandleChatMsgLoot(a1, a2, a3, a4, a5) end)
 
     elseif event == "LOOT_READY" or event == "LOOT_OPENED" then
@@ -677,6 +695,7 @@ eventFrame:SetScript("OnEvent", function(_, event, ...)
 
     elseif event == "CHAT_MSG_CURRENCY" then
         local msg = ...
+        msg = SafeString(msg)
         C_Timer.After(0, function() HandleCurrency(msg) end)
 
     elseif event == "QUEST_LOOT_RECEIVED" then
@@ -684,10 +703,12 @@ eventFrame:SetScript("OnEvent", function(_, event, ...)
 
     elseif event == "CHAT_MSG_COMBAT_FACTION_CHANGE" then
         local msg = ...
+        msg = SafeString(msg)
         C_Timer.After(0, function() HandleRepChange(msg) end)
 
     elseif event == "CHAT_MSG_COMBAT_HONOR_GAIN" then
         local msg = ...
+        msg = SafeString(msg)
         C_Timer.After(0, function() HandleHonor(msg) end)
     end
 end)

@@ -83,9 +83,11 @@ local function ApplyRowBorder(f)
         f._rowBorder = border
     end
     EnsureBackdrop(border)
+    local o   = (db and db.rowBorderOffset) or 0
+    local exp = sz + o
     border:ClearAllPoints()
-    border:SetPoint("TOPLEFT", f, "TOPLEFT", 0, 0)
-    border:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", 0, 0)
+    border:SetPoint("TOPLEFT",     f, "TOPLEFT",     -exp,  exp)
+    border:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT",  exp, -exp)
     if bFile then
         border:SetBackdrop({ edgeFile = bFile, edgeSize = sz })
     else
@@ -182,6 +184,11 @@ local pool = {}
 
 local CD_SECS = 3
 
+local ON_UPDATE_INTERVAL = 0.05
+local _feedAccum         = 0
+local _pfeedAccum        = 0
+local _cachedInGroup     = false
+
 local function GetGroupChannel()
     if IsInGroup(LE_PARTY_CATEGORY_INSTANCE) then
         return "INSTANCE_CHAT", "Instance"
@@ -197,6 +204,18 @@ local function GetCleanLink(link)
     if not link then return nil end
     return select(2, C_Item.GetItemInfo(link)) or link
 end
+
+do
+    local f = CreateFrame("Frame")
+    f:RegisterEvent("GROUP_ROSTER_UPDATE")
+    f:RegisterEvent("PLAYER_ENTERING_WORLD")
+    f:SetScript("OnEvent", function()
+        _cachedInGroup = IsInGroup()
+    end)
+end
+
+local function FeedOnUpdate(_, elapsed)  Feed:OnUpdate(elapsed)  end
+local function PFeedOnUpdate(_, elapsed) PFeed:OnUpdate(elapsed) end
 
 local function BuildMsg(template, name, itemDisplay)
     return template
@@ -295,6 +314,7 @@ local function AcquireRow(parent)
     local iconFrame = CreateFrame("Frame", nil, f)
     iconFrame:SetSize(ICON_SIZE, ICON_SIZE)
     iconFrame:SetPoint("LEFT", f, 7, 0)
+    iconFrame:SetFrameLevel(f:GetFrameLevel())
     f._iconFrame = iconFrame
 
     local icon = iconFrame:CreateTexture(nil, "ARTWORK")
@@ -303,7 +323,7 @@ local function AcquireRow(parent)
     f._icon = icon
 
     local function MakeEdgeLine()
-        local t = f:CreateTexture(nil, "OVERLAY")
+        local t = iconFrame:CreateTexture(nil, "OVERLAY")
         t:SetColorTexture(1, 1, 1, 1)
         t:SetSize(1, 1)
         return t
@@ -518,6 +538,8 @@ local function ReleaseRow(f)
     f:SetAlpha(1)
     f:Hide()
     f._itemLink = nil
+    f._flowSlot = nil
+    f._flowCfg  = nil
     if f._iconFrame then f._iconFrame._itemLink = nil end
     StopTrackedGlow(f, "_v")
     StopTrackedGlow(f, "_wl")
@@ -648,8 +670,6 @@ local function PopulateRow(f, entry)
     local rh     = db.feedRowHeight or ROW_H
     local iconSz = math.max(math.floor(rh - 4), 16)
     f._iconFrame:SetSize(iconSz, iconSz)
-    f._iconFrame:SetPoint("LEFT", f, 7, 0)
-    f._edge:SetWidth(4)
 
     local nameSz  = math.max(math.floor(rh * 0.30), 9)
     local subSz   = math.max(math.floor(rh * 0.25), 8)
@@ -736,22 +756,29 @@ local function PopulateRow(f, entry)
             or RARITY_COLOR[entry.rarity or 1] or DEFAULT_COLOR
 
     if db.showRarityBar ~= false then
+        local bsz = db.rarityBarSize or 4
+        local boff = db.rarityBarOffset or 0
+        f._edge:ClearAllPoints()
+        f._edge:SetPoint("TOPLEFT",    f, "TOPLEFT",    boff - bsz, 0)
+        f._edge:SetPoint("BOTTOMLEFT", f, "BOTTOMLEFT", boff - bsz, 0)
+        f._edge:SetWidth(bsz)
         f._edge:SetColorTexture(rc[1], rc[2], rc[3], 0.85)
         f._edge:Show()
-        f._iconFrame:SetPoint("LEFT", f, 7, 0)
     else
         f._edge:Hide()
-        f._iconFrame:SetPoint("LEFT", f, 3, 0)
     end
+    f._iconFrame:ClearAllPoints()
+    f._iconFrame:SetPoint("LEFT", f, 3, 0)
 
     if db.showIconBorder then
         local r, g, b = rc[1], rc[2], rc[3]
         local sz = iconSz
         local t = math.max(db.iconBorderThickness or 2, 1)
-        f._ib_top:ClearAllPoints();    f._ib_top:SetPoint("TOPLEFT", f._iconFrame, "TOPLEFT", 0, 0);         f._ib_top:SetSize(sz, t);    f._ib_top:SetColorTexture(r,g,b,1);    f._ib_top:Show()
-        f._ib_bottom:ClearAllPoints(); f._ib_bottom:SetPoint("BOTTOMLEFT", f._iconFrame, "BOTTOMLEFT", 0, 0); f._ib_bottom:SetSize(sz, t); f._ib_bottom:SetColorTexture(r,g,b,1); f._ib_bottom:Show()
-        f._ib_left:ClearAllPoints();   f._ib_left:SetPoint("TOPLEFT", f._iconFrame, "TOPLEFT", 0, 0);         f._ib_left:SetSize(t, sz);   f._ib_left:SetColorTexture(r,g,b,1);   f._ib_left:Show()
-        f._ib_right:ClearAllPoints();  f._ib_right:SetPoint("TOPRIGHT", f._iconFrame, "TOPRIGHT", 0, 0);      f._ib_right:SetSize(t, sz);  f._ib_right:SetColorTexture(r,g,b,1);  f._ib_right:Show()
+        local o = math.max(0, db.iconBorderOffset or 0)
+        f._ib_top:ClearAllPoints();    f._ib_top:SetPoint("TOPLEFT", f._iconFrame, "TOPLEFT", -o, o);          f._ib_top:SetSize(sz + 2*o, t);    f._ib_top:SetColorTexture(r,g,b,1);    f._ib_top:Show()
+        f._ib_bottom:ClearAllPoints(); f._ib_bottom:SetPoint("BOTTOMLEFT", f._iconFrame, "BOTTOMLEFT", -o, -o); f._ib_bottom:SetSize(sz + 2*o, t); f._ib_bottom:SetColorTexture(r,g,b,1); f._ib_bottom:Show()
+        f._ib_left:ClearAllPoints();   f._ib_left:SetPoint("TOPLEFT", f._iconFrame, "TOPLEFT", -o, o);          f._ib_left:SetSize(t, sz + 2*o);   f._ib_left:SetColorTexture(r,g,b,1);   f._ib_left:Show()
+        f._ib_right:ClearAllPoints();  f._ib_right:SetPoint("TOPRIGHT", f._iconFrame, "TOPRIGHT", o, o);        f._ib_right:SetSize(t, sz + 2*o);  f._ib_right:SetColorTexture(r,g,b,1);  f._ib_right:Show()
     else
         for _, l in ipairs(f._iconBorderLines) do l:Hide() end
     end
@@ -924,19 +951,34 @@ local function PositionAllRows()
     local sp     = db.feedSpacing   or ROW_SPACE
     local w      = db.feedWidth     or 280
     local growUp = db.feedGrowUp == true
-    local slot = 0
+    local cfg    = rh * 10000 + sp * 100 + (growUp and 1 or 0)
+    local slot   = 0
     for _, r in ipairs(rows) do
         local f = r.rowFrame
         f:SetWidth(w - PAD_SIDE * 2)
         f:SetHeight(rh)
-        f:ClearAllPoints()
         if not f:IsShown() then
-            f:SetPoint("TOPLEFT", feedFrame, "TOPLEFT", -9999, 0)
+            if f._flowSlot ~= -1 or f._flowCfg ~= cfg then
+                f._flowSlot = -1
+                f._flowCfg  = cfg
+                f:ClearAllPoints()
+                f:SetPoint("TOPLEFT", feedFrame, "TOPLEFT", -9999, 0)
+            end
         elseif growUp then
-            f:SetPoint("BOTTOMLEFT", feedFrame, "BOTTOMLEFT", PAD_SIDE, PAD_BOT + slot*(rh+sp))
+            if f._flowSlot ~= slot or f._flowCfg ~= cfg then
+                f._flowSlot = slot
+                f._flowCfg  = cfg
+                f:ClearAllPoints()
+                f:SetPoint("BOTTOMLEFT", feedFrame, "BOTTOMLEFT", PAD_SIDE, PAD_BOT + slot*(rh+sp))
+            end
             slot = slot + 1
         else
-            f:SetPoint("TOPLEFT",    feedFrame, "TOPLEFT",    PAD_SIDE, -(PAD_TOP + slot*(rh+sp)))
+            if f._flowSlot ~= slot or f._flowCfg ~= cfg then
+                f._flowSlot = slot
+                f._flowCfg  = cfg
+                f:ClearAllPoints()
+                f:SetPoint("TOPLEFT", feedFrame, "TOPLEFT", PAD_SIDE, -(PAD_TOP + slot*(rh+sp)))
+            end
             slot = slot + 1
         end
     end
@@ -982,9 +1024,6 @@ local function BuildFeedFrame()
                 return
             end
         end
-    end)
-    feedFrame:SetScript("OnUpdate", function(_, elapsed)
-        Feed:OnUpdate(elapsed)
     end)
     feedFrame:Hide()
 end
@@ -1059,6 +1098,7 @@ function Feed:AddEntry(entry)
         end
     end
 
+    local wasEmpty = #rows == 0
     local f = AcquireRow(feedFrame)
     f:SetWidth((db.feedWidth or 280) - PAD_SIDE * 2)
     f:SetHeight(db.feedRowHeight or ROW_H)
@@ -1067,8 +1107,10 @@ function Feed:AddEntry(entry)
     if entry.isPreview and db.showAHPrice and entry.link and not entry.ahPrice then
         local skipAH = (entry.canAH == false) or (not db.showJunkAH and (entry.rarity or 1) == 0)
         if not skipAH then
-            local ahv = LLF.Price:GetAHValue(entry.link)
-            if ahv then entry.ahPrice = ahv end
+            C_Timer.After(0.1, function()
+                local ahv = LLF.Price:GetAHValue(entry.link)
+                if ahv then entry.ahPrice = ahv end
+            end)
         end
     end
     PopulateRow(f, entry)
@@ -1076,6 +1118,7 @@ function Feed:AddEntry(entry)
     local record = { entry=entry, rowFrame=f, expiresAt=GetTime()+dur, fadeStart=nil }
     table.insert(rows, 1, record)
     PositionAllRows()
+    if wasEmpty then feedFrame:SetScript("OnUpdate", FeedOnUpdate) end
 
     if db.showAHPrice and entry.link and not entry.ahPrice then
         local skipAH = (entry.canAH == false)
@@ -1113,14 +1156,17 @@ function Feed:AddEntry(entry)
     end
 end
 
-function Feed:OnUpdate(_elapsed)
-    if #rows == 0 then return end
+function Feed:OnUpdate(elapsed)
+    if #rows == 0 then _feedAccum = 0; feedFrame:SetScript("OnUpdate", nil); return end
+    _feedAccum = _feedAccum + elapsed
+    if _feedAccum < ON_UPDATE_INTERVAL then return end
+    _feedAccum = 0
     local db = LLF.db
     if not db or not db.enabled then return end
     local now      = GetTime()
     local fadeTime = db.fadeOutTime or 0.5
     local dirty    = false
-    local inGroup  = IsInGroup()
+    local inGroup  = _cachedInGroup
     local i        = 1
     while i <= #rows do
         local r = rows[i]
@@ -1220,6 +1266,26 @@ function Feed:RefreshTestRows()
     end
 end
 
+function Feed:ShowDisabledMsg()
+    if not feedFrame then self:Init() end
+    local db = LLF.db
+    feedFrame:SetWidth(db.feedWidth or 400)
+    feedFrame:SetHeight(ROW_H + PAD_TOP + PAD_BOT)
+    feedFrame:Show()
+    if not feedFrame._disabledMsg then
+        local fs = feedFrame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+        fs:SetPoint("CENTER")
+        feedFrame._disabledMsg = fs
+    end
+    feedFrame._disabledMsg:SetText("Personal loot feed disabled in settings")
+    feedFrame._disabledMsg:SetTextColor(1, 1, 1, 0.65)
+    feedFrame._disabledMsg:Show()
+    C_Timer.After(3, function()
+        if feedFrame and feedFrame._disabledMsg then feedFrame._disabledMsg:Hide() end
+        if feedFrame and #rows == 0 then feedFrame:Hide() end
+    end)
+end
+
 function Feed:Preview()
     self:ClearAll()
     local samples = {
@@ -1297,15 +1363,21 @@ local function PositionAllPartyRows()
     local sp     = pdf.feedSpacing   or ROW_SPACE
     local w      = pdf.feedWidth     or 280
     local growUp = pdf.feedGrowUp == true
+    local cfg    = rh * 10000 + sp * 100 + (growUp and 1 or 0)
     for i, r in ipairs(partyRows) do
-        local f = r.rowFrame
+        local f    = r.rowFrame
+        local slot = i - 1
         f:SetWidth(w - PAD_SIDE * 2)
         f:SetHeight(rh)
-        f:ClearAllPoints()
-        if growUp then
-            f:SetPoint("BOTTOMLEFT", partyFeedFrame, "BOTTOMLEFT", PAD_SIDE, PAD_BOT + (i-1)*(rh+sp))
-        else
-            f:SetPoint("TOPLEFT",    partyFeedFrame, "TOPLEFT",    PAD_SIDE, -(PAD_TOP + (i-1)*(rh+sp)))
+        if f._flowSlot ~= slot or f._flowCfg ~= cfg then
+            f._flowSlot = slot
+            f._flowCfg  = cfg
+            f:ClearAllPoints()
+            if growUp then
+                f:SetPoint("BOTTOMLEFT", partyFeedFrame, "BOTTOMLEFT", PAD_SIDE, PAD_BOT + slot*(rh+sp))
+            else
+                f:SetPoint("TOPLEFT",    partyFeedFrame, "TOPLEFT",    PAD_SIDE, -(PAD_TOP + slot*(rh+sp)))
+            end
         end
     end
     ResizePartyFeedFrame()
@@ -1352,9 +1424,6 @@ local function BuildPartyFeedFrame()
                 return
             end
         end
-    end)
-    partyFeedFrame:SetScript("OnUpdate", function(_, elapsed)
-        PFeed:OnUpdate(elapsed)
     end)
     partyFeedFrame:Hide()
 end
@@ -1430,6 +1499,7 @@ function PFeed:AddEntry(entry)
         end
     end
 
+    local wasEmpty = #partyRows == 0
     local f = AcquireRow(partyFeedFrame)
     local pw = pdf.feedWidth or 280
     local prh = pdf.feedRowHeight or ROW_H
@@ -1442,6 +1512,7 @@ function PFeed:AddEntry(entry)
     local record = { entry=entry, rowFrame=f, expiresAt=GetTime()+dur, fadeStart=nil }
     table.insert(partyRows, 1, record)
     PositionAllPartyRows()
+    if wasEmpty then partyFeedFrame:SetScript("OnUpdate", PFeedOnUpdate) end
 
     if db.showAHPrice and entry.link and not entry.ahPrice then
         local skipAH = (entry.canAH == false)
@@ -1459,8 +1530,11 @@ function PFeed:AddEntry(entry)
     end
 end
 
-function PFeed:OnUpdate(_elapsed)
-    if #partyRows == 0 then return end
+function PFeed:OnUpdate(elapsed)
+    if #partyRows == 0 then _pfeedAccum = 0; partyFeedFrame:SetScript("OnUpdate", nil); return end
+    _pfeedAccum = _pfeedAccum + elapsed
+    if _pfeedAccum < ON_UPDATE_INTERVAL then return end
+    _pfeedAccum = 0
     local pdf = LLF.db.partyFeed
     if not pdf or not pdf.enabled then return end
     local now      = GetTime()
@@ -1559,6 +1633,26 @@ function PFeed:RefreshTestRows()
             PopulateRow(r.rowFrame, r.entry)
         end
     end
+end
+
+function PFeed:ShowDisabledMsg()
+    if not partyFeedFrame then self:Init() end
+    local pdf = LLF.db.partyFeed
+    partyFeedFrame:SetWidth(pdf.feedWidth or 400)
+    partyFeedFrame:SetHeight(ROW_H + PAD_TOP + PAD_BOT)
+    partyFeedFrame:Show()
+    if not partyFeedFrame._disabledMsg then
+        local fs = partyFeedFrame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+        fs:SetPoint("CENTER")
+        partyFeedFrame._disabledMsg = fs
+    end
+    partyFeedFrame._disabledMsg:SetText("Group loot feed disabled in settings")
+    partyFeedFrame._disabledMsg:SetTextColor(1, 1, 1, 0.65)
+    partyFeedFrame._disabledMsg:Show()
+    C_Timer.After(3, function()
+        if partyFeedFrame and partyFeedFrame._disabledMsg then partyFeedFrame._disabledMsg:Hide() end
+        if partyFeedFrame and #partyRows == 0 then partyFeedFrame:Hide() end
+    end)
 end
 
 function PFeed:Preview()

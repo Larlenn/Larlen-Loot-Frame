@@ -770,12 +770,54 @@ local function PageGeneral(parent, CW)
             if LLF.PartyFeed then LLF.PartyFeed:ApplyFont() end
             LLF.Feed:RefreshTestRows(); LLF.PartyFeed:RefreshTestRows()
         end)
-    p.RowL("Show crafting/gathering quality icon",
+    p.RowL("Show quality icon",
         function() return LLF.db.showCraftingQuality ~= false end,
         function(v) LLF.db.showCraftingQuality = v; LLF.Feed:RefreshTestRows(); LLF.PartyFeed:RefreshTestRows() end)
     p.RowR("Show upgrade track tier",
         function() return LLF.db.showUpgradeTrack ~= false end,
         function(v) LLF.db.showUpgradeTrack = v; LLF.Feed:RefreshTestRows(); LLF.PartyFeed:RefreshTestRows() end)
+    local function MakeStepCtrl(x, w, y, lbl, dbKey, defVal, minVal, maxVal, onChange)
+        local label = parent:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+        label:SetPoint("TOPLEFT", parent, x, y)
+        label:SetSize(w - 54, ROW_H)
+        label:SetJustifyH("LEFT")
+        label:SetText(lbl)
+        label:SetTextColor(WHITE[1], WHITE[2], WHITE[3], 1)
+        local pBtn = CreateFrame("Button", nil, parent, "BackdropTemplate")
+        pBtn:SetSize(18, ROW_H - 4)
+        pBtn:SetPoint("TOPLEFT", parent, x + w - 18, y - 2)
+        pBtn:SetBackdrop(FLAT_BD)
+        pBtn:SetBackdropColor(0.08, 0.08, 0.11, 1)
+        pBtn:SetBackdropBorderColor(ACCENT[1], ACCENT[2], ACCENT[3], 0.45)
+        local pFS = pBtn:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+        pFS:SetAllPoints(); pFS:SetJustifyH("CENTER")
+        pFS:SetText("+"); pFS:SetTextColor(ACCENT[1], ACCENT[2], ACCENT[3], 1)
+        local vFS = parent:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+        vFS:SetSize(18, ROW_H)
+        vFS:SetPoint("TOPRIGHT", pBtn, "TOPLEFT", 0, 2)
+        vFS:SetJustifyH("CENTER")
+        vFS:SetTextColor(WHITE[1], WHITE[2], WHITE[3], 1)
+        vFS:SetText(tostring(LLF.db[dbKey] or defVal))
+        local mBtn = CreateFrame("Button", nil, parent, "BackdropTemplate")
+        mBtn:SetSize(18, ROW_H - 4)
+        mBtn:SetPoint("TOPRIGHT", vFS, "TOPLEFT", 0, -2)
+        mBtn:SetBackdrop(FLAT_BD)
+        mBtn:SetBackdropColor(0.08, 0.08, 0.11, 1)
+        mBtn:SetBackdropBorderColor(ACCENT[1], ACCENT[2], ACCENT[3], 0.45)
+        local mFS = mBtn:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+        mFS:SetAllPoints(); mFS:SetJustifyH("CENTER")
+        mFS:SetText("-"); mFS:SetTextColor(ACCENT[1], ACCENT[2], ACCENT[3], 1)
+        local function Set(v)
+            v = math.max(minVal, math.min(maxVal, v))
+            LLF.db[dbKey] = v
+            vFS:SetText(tostring(v))
+            onChange()
+        end
+        mBtn:SetScript("OnClick", function() Set((LLF.db[dbKey] or defVal) - 1) end)
+        pBtn:SetScript("OnClick", function() Set((LLF.db[dbKey] or defVal) + 1) end)
+        return mBtn, vFS, pBtn, label
+    end
+
     p.RowL("Show rarity color bar",
         function() return LLF.db.showRarityBar ~= false end,
         function(v)
@@ -785,72 +827,65 @@ local function PageGeneral(parent, CW)
             LLF.Feed:RefreshTestRows(); LLF.PartyFeed:RefreshTestRows()
         end)
     do
-        local y0 = p.GetY()
+        local y0     = p.GetY()
         local rightX = p.PAD + p.HALF + 8
-
-        local borderToggle = MakeToggle(parent, "Icon border",
-            function() return LLF.db.showIconBorder == true end,
-            function(v)
-                LLF.db.showIconBorder = v
-                LLF.Feed:ApplyFont()
-                if LLF.PartyFeed then LLF.PartyFeed:ApplyFont() end
-                LLF.Feed:RefreshTestRows(); LLF.PartyFeed:RefreshTestRows()
-            end)
-        borderToggle:SetPoint("TOPLEFT", parent, rightX, y0)
-        borderToggle:SetWidth(p.HALF - 62)
-
-        local plusBtn = CreateFrame("Button", nil, parent, "BackdropTemplate")
-        plusBtn:SetSize(18, ROW_H - 4)
-        plusBtn:SetPoint("TOPLEFT", parent, rightX + p.HALF - 18, y0 - 2)
-        plusBtn:SetBackdrop(FLAT_BD)
-        plusBtn:SetBackdropColor(0.08, 0.08, 0.11, 1)
-        plusBtn:SetBackdropBorderColor(ACCENT[1], ACCENT[2], ACCENT[3], 0.45)
-        local plusFS = plusBtn:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-        plusFS:SetAllPoints(); plusFS:SetJustifyH("CENTER")
-        plusFS:SetText("+"); plusFS:SetTextColor(ACCENT[1], ACCENT[2], ACCENT[3], 1)
-
-        local valFS = parent:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-        valFS:SetSize(18, ROW_H)
-        valFS:SetPoint("TOPRIGHT", plusBtn, "TOPLEFT", 0, 2)
-        valFS:SetJustifyH("CENTER")
-        valFS:SetTextColor(WHITE[1], WHITE[2], WHITE[3], 1)
-        valFS:SetText(tostring(LLF.db.iconBorderThickness or 2))
-
-        local minusBtn = CreateFrame("Button", nil, parent, "BackdropTemplate")
-        minusBtn:SetSize(18, ROW_H - 4)
-        minusBtn:SetPoint("TOPRIGHT", valFS, "TOPLEFT", 0, -2)
-        minusBtn:SetBackdrop(FLAT_BD)
-        minusBtn:SetBackdropColor(0.08, 0.08, 0.11, 1)
-        minusBtn:SetBackdropBorderColor(ACCENT[1], ACCENT[2], ACCENT[3], 0.45)
-        local minusFS = minusBtn:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-        minusFS:SetAllPoints(); minusFS:SetJustifyH("CENTER")
-        minusFS:SetText("-"); minusFS:SetTextColor(ACCENT[1], ACCENT[2], ACCENT[3], 1)
-
-        local function SetThick(v)
-            v = math.max(1, math.min(6, v))
-            LLF.db.iconBorderThickness = v
-            valFS:SetText(tostring(v))
+        local Q      = math.floor(p.HALF / 2)
+        local rbRef  = function()
             LLF.Feed:ApplyFont()
             if LLF.PartyFeed then LLF.PartyFeed:ApplyFont() end
             LLF.Feed:RefreshTestRows(); LLF.PartyFeed:RefreshTestRows()
         end
-        minusBtn:SetScript("OnClick", function() SetThick((LLF.db.iconBorderThickness or 2) - 1) end)
-        plusBtn:SetScript("OnClick",  function() SetThick((LLF.db.iconBorderThickness or 2) + 1) end)
+        local rbSzM, rbSzV, rbSzP, rbSzL = MakeStepCtrl(rightX,         Q,             y0, "Size",       "rarityBarSize",   4,  1, 12, rbRef)
+        local rbOfM, rbOfV, rbOfP, rbOfL = MakeStepCtrl(rightX + Q + 4, p.HALF - Q - 4, y0, "Offset",     "rarityBarOffset", 0, -8,  8, rbRef)
+        local function SyncRarityCtrl()
+            local on = LLF.db.showRarityBar ~= false
+            local a = on and 1 or 0.30
+            rbSzM:SetAlpha(a); rbSzM:EnableMouse(on); rbSzV:SetAlpha(a); rbSzP:SetAlpha(a); rbSzP:EnableMouse(on); rbSzL:SetAlpha(a)
+            rbOfM:SetAlpha(a); rbOfM:EnableMouse(on); rbOfV:SetAlpha(a); rbOfP:SetAlpha(a); rbOfP:EnableMouse(on); rbOfL:SetAlpha(a)
+        end
+        SyncRarityCtrl()
+        local rbSentinel = {}
+        rbSentinel.Sync = function(_self)
+            SyncRarityCtrl()
+            rbSzV:SetText(tostring(LLF.db.rarityBarSize or 4))
+            rbOfV:SetText(tostring(LLF.db.rarityBarOffset or 0))
+        end
+        allToggles[#allToggles + 1] = rbSentinel
+        p.SetY(y0 - ROW_H - p.SEP)
+    end
 
+    p.RowL("Icon border",
+        function() return LLF.db.showIconBorder == true end,
+        function(v)
+            LLF.db.showIconBorder = v
+            LLF.Feed:ApplyFont()
+            if LLF.PartyFeed then LLF.PartyFeed:ApplyFont() end
+            LLF.Feed:RefreshTestRows(); LLF.PartyFeed:RefreshTestRows()
+        end)
+    do
+        local y0     = p.GetY()
+        local rightX = p.PAD + p.HALF + 8
+        local Q      = math.floor(p.HALF / 2)
+        local ibRef  = function()
+            LLF.Feed:ApplyFont()
+            if LLF.PartyFeed then LLF.PartyFeed:ApplyFont() end
+            LLF.Feed:RefreshTestRows(); LLF.PartyFeed:RefreshTestRows()
+        end
+        local szM, szV, szP, szL = MakeStepCtrl(rightX,         Q,             y0, "Size",          "iconBorderThickness", 2, 1, 6, ibRef)
+        local ofM, ofV, ofP, ofL = MakeStepCtrl(rightX + Q + 4, p.HALF - Q - 4, y0, "Offset",        "iconBorderOffset",    0, 0, 8, ibRef)
         local function SyncBorderDisabled()
             local on = LLF.db.showIconBorder == true
             local a = on and 1 or 0.30
-            minusBtn:SetAlpha(a); minusBtn:EnableMouse(on)
-            plusBtn:SetAlpha(a);  plusBtn:EnableMouse(on)
-            valFS:SetAlpha(a)
+            szM:SetAlpha(a); szM:EnableMouse(on); szV:SetAlpha(a); szP:SetAlpha(a); szP:EnableMouse(on); szL:SetAlpha(a)
+            ofM:SetAlpha(a); ofM:EnableMouse(on); ofV:SetAlpha(a); ofP:SetAlpha(a); ofP:EnableMouse(on); ofL:SetAlpha(a)
         end
         SyncBorderDisabled()
         local sentinel = {}
         sentinel.Sync = function(_self)
             SyncBorderDisabled()
-            valFS:SetText(tostring(LLF.db.iconBorderThickness or 2))
+            szV:SetText(tostring(LLF.db.iconBorderThickness or 2))
+            ofV:SetText(tostring(LLF.db.iconBorderOffset or 0))
         end
-        allToggles[#allToggles + 1] = borderToggle
         allToggles[#allToggles + 1] = sentinel
         p.SetY(y0 - ROW_H - p.SEP)
     end
@@ -902,10 +937,16 @@ local function PageGeneral(parent, CW)
         end,
         BorderItems)
 
-    p.SlideInput("Border size", 1, 32, 1,
+    p.SlideInputL("Border size", 1, 32, 1,
         function() return LLF.db.rowBorderSize or 1 end,
         function(v)
             LLF.db.rowBorderSize = v
+            ApplyBorderChange()
+        end)
+    p.SlideInputR("Border offset", -8, 16, 1,
+        function() return LLF.db.rowBorderOffset or 0 end,
+        function(v)
+            LLF.db.rowBorderOffset = v
             ApplyBorderChange()
         end)
 
@@ -1048,7 +1089,10 @@ local function PageLayout(parent, CW)
     local y1 = p.GetY()
     local testBtn = MakeBtn(parent, "Test Rows", 110, ROW_H)
     testBtn:SetPoint("TOPLEFT", parent, p.PAD, y1)
-    testBtn:SetScript("OnClick", function() LLF.Feed._previewSoundPlayed = false; LLF.Feed:Preview() end)
+    testBtn:SetScript("OnClick", function()
+        if LLF.db.personalEnabled == false then LLF.Feed:ShowDisabledMsg(); return end
+        LLF.Feed._previewSoundPlayed = false; LLF.Feed:Preview()
+    end)
     local clearBtn = MakeBtn(parent, "Clear Test", 100, ROW_H)
     clearBtn:SetPoint("LEFT", testBtn, "RIGHT", 6, 0)
     local lockTestBtn = MakeBtn(parent, "Lock Test", 90, ROW_H)
@@ -1072,7 +1116,12 @@ local function PageLayout(parent, CW)
     lockTestBtn:SetScript("OnClick", function()
         LLF.Feed.testLocked = not LLF.Feed.testLocked
         if LLF.Feed.testLocked then
-            LLF.Feed:Preview()
+            if LLF.db.personalEnabled == false then
+                LLF.Feed.testLocked = false
+                LLF.Feed:ShowDisabledMsg()
+            else
+                LLF.Feed:Preview()
+            end
         else
             local now = GetTime()
             for _, r in ipairs(LLF.Feed._rows or {}) do
@@ -1689,6 +1738,14 @@ local function PageFilters(parent, CW)
         end
     end
 
+    p.Header("|cff55bbffGroup Loot|r - Item Types")
+    p.RowL("|cff44ddffPets|r",
+        function() return LLF.db.partyFeed.filterPets ~= false end,
+        function(v) LLF.db.partyFeed.filterPets = v end)
+    p.RowR("|cff44ddffMounts|r",
+        function() return LLF.db.partyFeed.filterMounts ~= false end,
+        function(v) LLF.db.partyFeed.filterMounts = v end)
+
     p.Finalize()
 end
 
@@ -1701,14 +1758,24 @@ local function PagePartyFeed(parent, CW)
     p.Row("Enable group loot feed",
         function() return pdf().enabled end,
         function(v) pdf().enabled = v
-            if not v then LLF.PartyFeed:ClearAll() else LLF.PartyFeed:Refresh() end
+            if not v then LLF.PartyFeed:ClearAll() else LLF.PartyFeed:Refresh(); if LLF.PartyFeed.testLocked then LLF.PartyFeed:Preview() end end
         end)
-    p.RowL("Show party loot",
+    local tParty = p.RowL("Show party loot",
         function() return pdf().showParty end,
         function(v) pdf().showParty = v end)
-    p.RowR("Show raid loot",
+    local tRaid = p.RowR("Show raid loot",
         function() return pdf().showRaid end,
         function(v) pdf().showRaid = v end)
+    local function SyncGroupGate()
+        local on = pdf().enabled
+        local a = on and 1 or 0.35
+        tParty:SetAlpha(a); tParty:EnableMouse(on)
+        tRaid:SetAlpha(a);  tRaid:EnableMouse(on)
+    end
+    SyncGroupGate()
+    local ggSentinel = {}
+    ggSentinel.Sync = function() SyncGroupGate() end
+    allToggles[#allToggles + 1] = ggSentinel
 
     p.Header("Minimum Rarity to Show")
     p.Picker("", 24,
@@ -1723,14 +1790,6 @@ local function PagePartyFeed(parent, CW)
                 { value = 5, display = "|cffff8000Legendary|r|cffffffff only|r"            },
             }
         end)
-
-    p.Header("Item Types")
-    p.RowL("|cff44ddffPets|r",
-        function() return pdf().filterPets ~= false end,
-        function(v) pdf().filterPets = v end)
-    p.RowR("|cff44ddffMounts|r",
-        function() return pdf().filterMounts ~= false end,
-        function(v) pdf().filterMounts = v end)
 
     p.Header("Growth Direction")
     p.Sep(2)
@@ -1774,6 +1833,41 @@ local function PagePartyFeed(parent, CW)
         function() return pdf().fadeOutTime or 0.5 end,
         function(v) pdf().fadeOutTime = v end)
 
+    do
+        local yCopy = p.GetY()
+        local copyBtn = MakeBtn(parent, "Copy Personal Layout", 170, ROW_H)
+        copyBtn:SetPoint("TOPLEFT", parent, p.PAD, yCopy)
+        copyBtn:SetScript("OnClick", function()
+            local db  = LLF.db
+            local pdf = db.partyFeed
+            pdf.feedWidth     = db.feedWidth
+            pdf.feedRowHeight = db.feedRowHeight
+            pdf.feedSpacing   = db.feedSpacing
+            pdf.feedMaxRows   = db.feedMaxRows
+            pdf.feedGrowUp    = db.feedGrowUp
+            pdf.feedAlpha     = db.feedAlpha
+            pdf.feedBgAlpha   = db.feedBgAlpha
+            pdf.rowBgAlpha    = db.rowBgAlpha
+            pdf.fadeOutTime   = db.fadeOutTime
+            LLF.PartyFeed:Refresh()
+            LLF.PartyFeed:ApplyLayout()
+            RefreshAll()
+        end)
+        copyBtn:SetScript("OnEnter", function(s)
+            GameTooltip:SetOwner(s, "ANCHOR_RIGHT")
+            GameTooltip:SetText("Copy Personal Layout", 1, 1, 1)
+            GameTooltip:AddLine("Copies the following from Personal feed:", 0.7, 0.7, 0.7, true)
+            GameTooltip:AddLine(" ", 1, 1, 1)
+            GameTooltip:AddLine("• Feed width, Row height, Row spacing", 0.9, 0.9, 0.9, true)
+            GameTooltip:AddLine("• Max rows, Growth direction", 0.9, 0.9, 0.9, true)
+            GameTooltip:AddLine("• Feed opacity, Frame background, Row background", 0.9, 0.9, 0.9, true)
+            GameTooltip:AddLine("• Fade-out time", 0.9, 0.9, 0.9, true)
+            GameTooltip:Show()
+        end)
+        copyBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
+        p.SetY(yCopy - ROW_H - p.SEP)
+    end
+
     p.Header("Position")
     p.Row("Lock position",
         function() return pdf().feedLocked end,
@@ -1783,7 +1877,10 @@ local function PagePartyFeed(parent, CW)
     local y1 = p.GetY()
     local testBtn = MakeBtn(parent, "Test Rows", 110, ROW_H)
     testBtn:SetPoint("TOPLEFT", parent, p.PAD, y1)
-    testBtn:SetScript("OnClick", function() LLF.PartyFeed:Preview() end)
+    testBtn:SetScript("OnClick", function()
+        if not pdf().enabled then LLF.PartyFeed:ShowDisabledMsg(); return end
+        LLF.PartyFeed:Preview()
+    end)
     local clearBtn = MakeBtn(parent, "Clear Test", 100, ROW_H)
     clearBtn:SetPoint("LEFT", testBtn, "RIGHT", 6, 0)
     local pLockTestBtn = MakeBtn(parent, "Lock Test", 90, ROW_H)
@@ -1808,29 +1905,16 @@ local function PagePartyFeed(parent, CW)
     pLockTestBtn:SetScript("OnClick", function()
         LLF.PartyFeed.testLocked = not LLF.PartyFeed.testLocked
         if LLF.PartyFeed.testLocked then
-            LLF.PartyFeed:Preview()
+            if not pdf().enabled then
+                LLF.PartyFeed.testLocked = false
+                LLF.PartyFeed:ShowDisabledMsg()
+            else
+                LLF.PartyFeed:Preview()
+            end
         end
         SyncPLockBtn()
     end)
 
-    local copyBtn = MakeBtn(parent, "Copy Personal Layout", 170, ROW_H)
-    copyBtn:SetPoint("LEFT", pLockTestBtn, "RIGHT", 6, 0)
-    copyBtn:SetScript("OnClick", function()
-        local db  = LLF.db
-        local pdf = db.partyFeed
-        pdf.feedWidth     = db.feedWidth
-        pdf.feedRowHeight = db.feedRowHeight
-        pdf.feedSpacing   = db.feedSpacing
-        pdf.feedMaxRows   = db.feedMaxRows
-        pdf.feedGrowUp    = db.feedGrowUp
-        pdf.feedAlpha     = db.feedAlpha
-        pdf.feedBgAlpha   = db.feedBgAlpha
-        pdf.rowBgAlpha    = db.rowBgAlpha
-        pdf.fadeOutTime   = db.fadeOutTime
-        LLF.PartyFeed:Refresh()
-        LLF.PartyFeed:ApplyLayout()
-        RefreshAll()
-    end)
     p.SetY(y1 - ROW_H - SEP)
 
     p.Header("Indicators")
@@ -3451,7 +3535,7 @@ local function BuildBlizzardPanel()
 
     local verFS = panel:CreateFontString(nil, "ARTWORK", "GameFontNormalSmall")
     verFS:SetPoint("TOPLEFT", titleFS, "BOTTOMLEFT", 0, -2)
-    verFS:SetText("v" .. (LLF.VERSION or "1.0.0")); verFS:SetTextColor(GREY[1], GREY[2], GREY[3])
+    verFS:SetText("v" .. (LLF.VERSION or "1.1.0")); verFS:SetTextColor(GREY[1], GREY[2], GREY[3])
 
     local divider = panel:CreateTexture(nil, "ARTWORK")
     divider:SetHeight(1)
@@ -3531,7 +3615,7 @@ local function BuildFloatWindow()
 
     local verFS = floatWin:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
     verFS:SetPoint("TOPLEFT", titleFS, "BOTTOMLEFT", 0, -1)
-    verFS:SetText("v" .. (LLF.VERSION or "1.0.0"))
+    verFS:SetText("v" .. (LLF.VERSION or "1.1.0"))
     verFS:SetTextColor(DIMMER[1], DIMMER[2], DIMMER[3], 1)
 
     local headerLine = floatWin:CreateTexture(nil, "ARTWORK")
