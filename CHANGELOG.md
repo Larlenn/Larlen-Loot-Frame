@@ -1,23 +1,13 @@
 # Larlen Loot Frame Changelog
 
 ## v1.1.0
-- Finalised secret-string taint hardening for event payloads to prevent rare user-specific Lua errors in loot, currency, honor, reputation, and encounter handlers
-- Added centralized safe string sanitization for deferred chat/event processing paths to avoid unsafe string conversion/index operations
-- Optimised AH price lookup in personal loot feed to prevent frame drops during heavy loot events
-- Optimised OnUpdate loop - throttled to 20Hz on both feeds, IsInGroup cached via GROUP_ROSTER_UPDATE instead of polling every frame
-- OnUpdate script now self-terminating - unregistered when feed is empty, re-registered on first new entry, zero per-frame cost at idle
-- Reflow anchor cache - SetPoint skipped when row position unchanged, reduces GPU anchor churn on every dirty tick
-- Rarity color bar now has adjustable size (bar width in pixels) and horizontal offset - bar overlays the row left edge as a decoration without displacing row content
-- Icon border now has separate size (thickness) and offset controls via +/- buttons in options, displayed on the same row as the toggle
-- Added row border offset setting - allows fine-tuning border inset/outset independently of border size; fixed negative offset values now correctly inset the border rather than clamping
-- Added independent personal feed enable/disable handling and improved disabled-feed test row messaging
-- Group loot feed toggles now properly gate "Show party loot" and "Show raid loot" controls when disabled
-- Improved group loot options gating and reorganized Group Loot options layout for clearer control flow
-- Added and refined copy-layout UX, placement, and tooltip behavior
-- Moved "Copy Personal Layout" button to standalone position between Opacity and Indicators sections
-- Reordered Group Loot page sections: Opacity > Copy Personal Layout > Indicators > Position
-- Added tooltip to "Copy Personal Layout" button detailing which settings are copied
-- Renamed "Show crafting/gathering quality icon" to "Show quality icon" in options
+- Improved performance in heavy loot moments, including faster AH price handling and lower idle CPU usage
+- Fixed taint and secret-string related errors in deferred loot, currency, honor, reputation, and encounter processing
+- Added personal feed enable/disable handling with clearer feedback when test rows are triggered while a feed is disabled
+- Improved group loot controls so party/raid toggles are properly gated and easier to manage
+- Added configurable rarity bar width/offset and expanded icon/row border size and offset controls
+- Improved options layout around Group Loot and Copy Personal Layout, including clearer placement and tooltip text
+- Renamed "Show crafting/gathering quality icon" to "Show quality icon" for clearer wording
 
 ## v1.0.9
 - Fixed Lua taint errors comprehensively across all files - all string method calls on event-sourced strings replaced with safe global equivalents across Core.lua, Config.lua, and PriceHelper.lua
