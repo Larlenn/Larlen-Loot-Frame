@@ -1,5 +1,10 @@
 # Larlen Loot Frame Changelog
 
+## v1.1.1
+- Fixed gold amounts doubling when world quest rewards merged with other gold events
+- Fixed crafted item counts showing 1 instead of the correct quantity when crafting multiple items
+- Added AH price display to group loot feed rows, matching personal loot behaviour
+
 ## v1.1.0
 - Improved performance in heavy loot moments, including faster AH price handling and lower idle CPU usage
 - Fixed taint and secret-string related errors in deferred loot, currency, honor, reputation, and encounter processing

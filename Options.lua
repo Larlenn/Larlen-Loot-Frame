@@ -3535,7 +3535,7 @@ local function BuildBlizzardPanel()
 
     local verFS = panel:CreateFontString(nil, "ARTWORK", "GameFontNormalSmall")
     verFS:SetPoint("TOPLEFT", titleFS, "BOTTOMLEFT", 0, -2)
-    verFS:SetText("v" .. (LLF.VERSION or "1.1.0")); verFS:SetTextColor(GREY[1], GREY[2], GREY[3])
+    verFS:SetText("v" .. (LLF.VERSION or "1.1.1")); verFS:SetTextColor(GREY[1], GREY[2], GREY[3])
 
     local divider = panel:CreateTexture(nil, "ARTWORK")
     divider:SetHeight(1)
@@ -3615,7 +3615,7 @@ local function BuildFloatWindow()
 
     local verFS = floatWin:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
     verFS:SetPoint("TOPLEFT", titleFS, "BOTTOMLEFT", 0, -1)
-    verFS:SetText("v" .. (LLF.VERSION or "1.1.0"))
+    verFS:SetText("v" .. (LLF.VERSION or "1.1.1"))
     verFS:SetTextColor(DIMMER[1], DIMMER[2], DIMMER[3], 1)
 
     local headerLine = floatWin:CreateTexture(nil, "ARTWORK")

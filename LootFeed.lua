@@ -1082,12 +1082,16 @@ function Feed:AddEntry(entry)
     if entry.mergeKey then
         for _, r in ipairs(rows) do
             if r.entry.mergeKey == entry.mergeKey then
-                local newCount = (r.entry.count or 1) + (entry.count or 1)
-                if r.entry.isGear or r.entry.canAH == false then newCount = 1 end
-                r.entry.count = newCount
-                if entry.isGear and entry.ilvl and entry.ilvl > (r.entry.ilvl or 0) then
-                    r.entry.ilvl = entry.ilvl
-                    r.entry.upgradeTrackTier = entry.upgradeTrackTier
+                if r.entry.source == 1 and entry.source == 1 then
+                    r.entry.price = r.entry.price + entry.price
+                else
+                    local newCount = (r.entry.count or 1) + (entry.count or 1)
+                    if r.entry.isGear or r.entry.canAH == false then newCount = 1 end
+                    r.entry.count = newCount
+                    if entry.isGear and entry.ilvl and entry.ilvl > (r.entry.ilvl or 0) then
+                        r.entry.ilvl = entry.ilvl
+                        r.entry.upgradeTrackTier = entry.upgradeTrackTier
+                    end
                 end
                 r.expiresAt   = GetTime() + dur
                 r.fadeStart   = nil
@@ -1483,12 +1487,16 @@ function PFeed:AddEntry(entry)
     if entry.mergeKey then
         for _, r in ipairs(partyRows) do
             if r.entry.mergeKey == entry.mergeKey then
-                local newCount = (r.entry.count or 1) + (entry.count or 1)
-                if r.entry.isGear or r.entry.canAH == false then newCount = 1 end
-                r.entry.count = newCount
-                if entry.isGear and entry.ilvl and entry.ilvl > (r.entry.ilvl or 0) then
-                    r.entry.ilvl = entry.ilvl
-                    r.entry.upgradeTrackTier = entry.upgradeTrackTier
+                if r.entry.source == 1 and entry.source == 1 then
+                    r.entry.price = r.entry.price + entry.price
+                else
+                    local newCount = (r.entry.count or 1) + (entry.count or 1)
+                    if r.entry.isGear or r.entry.canAH == false then newCount = 1 end
+                    r.entry.count = newCount
+                    if entry.isGear and entry.ilvl and entry.ilvl > (r.entry.ilvl or 0) then
+                        r.entry.ilvl = entry.ilvl
+                        r.entry.upgradeTrackTier = entry.upgradeTrackTier
+                    end
                 end
                 r.expiresAt   = GetTime() + dur
                 r.fadeStart   = nil
@@ -1514,6 +1522,18 @@ function PFeed:AddEntry(entry)
     PositionAllPartyRows()
     if wasEmpty then partyFeedFrame:SetScript("OnUpdate", PFeedOnUpdate) end
 
+    if entry.isPreview and db.showAHPrice and entry.link and not entry.ahPrice then
+        local skipAH = (entry.canAH == false) or (not db.showJunkAH and (entry.rarity or 1) == 0)
+        if not skipAH then
+            C_Timer.After(0.1, function()
+                local ahv = LLF.Price:GetAHValue(entry.link)
+                if ahv then
+                    record.entry.ahPrice = ahv
+                    if record.rowFrame:IsShown() then PopulateRow(record.rowFrame, record.entry) end
+                end
+            end)
+        end
+    end
     if db.showAHPrice and entry.link and not entry.ahPrice then
         local skipAH = (entry.canAH == false)
             or (not db.showJunkAH and (entry.rarity or 1) == 0)
@@ -1658,7 +1678,7 @@ end
 function PFeed:Preview()
     self:ClearAll()
     local samples = {
-        { icon=135274,  name="Thunderfury, Blessed Blade",   rarity=5, source=4, ilvl=650, isGear=true,  price=987654,
+        { icon=135274,  name="Thunderfury, Blessed Blade",   rarity=5, source=4, ilvl=650, isGear=true,  price=987654,  ahPrice=12500000, canAH=true,
           playerName="Grimveil", playerNameFull="Grimveil", subType="One-Handed Sword", mergeKey="ppvWHISPER_TEST", isPreview=true,
           link="|cffff8000|Hitem:19019::::::::60:::::|h[Thunderfury, Blessed Blade]|h|r" },
         { icon=136243,  name="Dreadful Gladiator's Blade",  rarity=4, source=3, ilvl=398, isGear=true,  price=50000,  subType="Two-Handed Sword", playerName="Stormwrath", mergeKey="ppv1", isPreview=true, upgradeTrackTier=3,

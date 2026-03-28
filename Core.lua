@@ -418,7 +418,12 @@ local function HandleChatMsgLoot(msg, _, _, _, sender)
     if not link then link = string.match(msg, "(|Hitem:.-|h%[.-%]|h)") end
     if not link then return end
     local itemID = string.match(link, "item:(%d+)") or link
-    if recentLoot[itemID] then return end
+    if recentLoot[itemID] then
+        if recentLoot[itemID] > 0 then
+            recentLoot[itemID] = recentLoot[itemID] - 1
+            return
+        end
+    end
     local entry = EntryFromLink(link, tonumber(string.match(msg, "x(%d+)%s*$")) or 1, 4)
     if entry and not ShouldFilterCategory(entry.itemCategory, false) then LLF.Feed:AddEntry(entry) end
 end
@@ -432,7 +437,7 @@ local function HandleEncounterLoot(_, _, link, count, playerName)
     local isMe = (playerName == UnitName("player"))
     if not isMe then return end
     local itemID = string.match(link, "item:(%d+)") or link
-    recentLoot[itemID] = true
+    recentLoot[itemID] = (recentLoot[itemID] or 0) + 1
     C_Timer.After(1, function() recentLoot[itemID] = nil end)
     local entry = EntryFromLink(link, tonumber(count) or 1, 3)
     if entry and not ShouldFilterCategory(entry.itemCategory, false) then LLF.Feed:AddEntry(entry) end
