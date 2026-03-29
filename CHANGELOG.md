@@ -1,5 +1,10 @@
 # Larlen Loot Frame Changelog
 
+## v1.1.2
+- Updated upgrade arrow to use the native WoW bag UI atlas for a cleaner look
+- Updated transmog indicator to use the native WoW transmog atlas icon
+- Fixed and adjusted test rows behaviour
+
 ## v1.1.1
 - Fixed gold amounts doubling when world quest rewards merged with other gold events
 - Fixed crafted item counts showing 1 instead of the correct quantity when crafting multiple items

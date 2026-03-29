@@ -336,14 +336,14 @@ local function AcquireRow(parent)
     for _, l in ipairs(f._iconBorderLines) do l:Hide() end
 
     local upArrow = iconFrame:CreateTexture(nil, "OVERLAY")
-    upArrow:SetTexture("Interface\\ChatFrame\\UI-ChatIcon-ScrollUp-Up")
-    upArrow:SetVertexColor(0.0, 1.0, 0.2, 1)
-    upArrow:SetSize(26, 26)
+    upArrow:SetAtlas("bags-greenarrow")
+    upArrow:SetSize(15, 16)
     upArrow:SetPoint("TOPLEFT", icon, "TOPLEFT", -1, 2)
     upArrow:Hide()
     f._upgradeArrow = upArrow
 
     local tmogIcon = iconFrame:CreateTexture(nil, "OVERLAY")
+    tmogIcon:SetAtlas("transmog-icon-hidden")
     tmogIcon:SetSize(20, 20)
     tmogIcon:SetPoint("TOPRIGHT", icon, "TOPRIGHT", 1, 2)
     tmogIcon:Hide()
@@ -436,7 +436,10 @@ local function AcquireRow(parent)
             else
                 GameTooltip:SetText("|cffff4444Not in a group|r", 1, 1, 1, 1, true)
             end
-            GameTooltip:AddLine(BuildMsg(GetNeedTemplate(), self._whisperDisplay or self._whisperTarget or "", "[item]"), 0.8, 0.8, 0.8, true)
+            local db = LLF.db
+            local tmpl = (db and db.needMessage) or "{name}, do you need {item}?"
+            local preview = tmpl:gsub("{item}", function() return "[item]" end)
+            GameTooltip:AddLine(preview, 0.8, 0.8, 0.8, true)
             GameTooltip:Show()
         end
     end)
@@ -663,6 +666,33 @@ local function ApplyRowGlow(f, entry)
     end
 end
 
+local function RefreshPriceDisplay(f, entry)
+    local db    = LLF.db
+    local count = entry.count or 1
+    local prefixMode = db.pricePrefixMode or 4
+    local ahPrefix, vendorPrefix = "", ""
+    if prefixMode == 2 or prefixMode == 4 then ahPrefix    = "|cff32bff7AH:|r " end
+    if prefixMode == 3 or prefixMode == 4 then vendorPrefix = "|cff8fe36bV:|r " end
+    local ahText, vendorText = "", ""
+    if db.showAHPrice and entry.ahPrice and entry.ahPrice > 0 then
+        ahText = ahPrefix .. "|cff32bff7" .. LLF.Price:FormatAuto(entry.ahPrice * count) .. "|r"
+    end
+    if db.showVendorPrice and entry.price and entry.price > 0 then
+        local venAmt = db.showStackPrice and (entry.price * count) or entry.price
+        vendorText = vendorPrefix .. "|cffffff00" .. LLF.Price:FormatAuto(venAmt) .. "|r"
+    end
+    if ahText ~= "" and vendorText ~= "" then
+        f._priceTop:SetText(ahText)
+        f._priceMid:SetText(vendorText)
+    elseif ahText ~= "" then
+        f._priceTop:SetText("")
+        f._priceMid:SetText(ahText)
+    else
+        f._priceTop:SetText("")
+        f._priceMid:SetText(vendorText)
+    end
+end
+
 local function PopulateRow(f, entry)
     local db    = LLF.db
     local count = entry.count or 1
@@ -743,9 +773,6 @@ local function PopulateRow(f, entry)
             else
                 f._tmogIcon:SetPoint("TOPRIGHT", f._iconFrame, "TOPRIGHT", 1, 2)
             end
-            f._tmogIcon:SetTexture(7344439)
-            f._tmogIcon:SetTexCoord(0.65771484375, 0.71240234375, 0.61669921875, 0.67138671875)
-            f._tmogIcon:SetVertexColor(1, 1, 1, 1)
             f._tmogIcon:Show()
         else
             f._tmogIcon:Hide()
@@ -840,33 +867,7 @@ local function PopulateRow(f, entry)
         subParts[#subParts+1] = "|cffaaaaaa" .. entry.invCount .. " owned|r"
     end
     f._sub:SetText(table.concat(subParts, "  "))
-    local prefixMode = db.pricePrefixMode or 4
-    local ahPrefix = ""
-    local vendorPrefix = ""
-    if prefixMode == 2 or prefixMode == 4 then
-        ahPrefix = "|cff32bff7AH:|r "
-    end
-    if prefixMode == 3 or prefixMode == 4 then
-        vendorPrefix = "|cff8fe36bV:|r "
-    end
-    local ahText, vendorText = "", ""
-    if db.showAHPrice and entry.ahPrice and entry.ahPrice > 0 then
-        ahText = ahPrefix .. "|cff32bff7" .. LLF.Price:FormatAuto(entry.ahPrice * count) .. "|r"
-    end
-    if db.showVendorPrice and entry.price and entry.price > 0 then
-        local venAmt = db.showStackPrice and (entry.price * count) or entry.price
-        vendorText = vendorPrefix .. "|cffffff00" .. LLF.Price:FormatAuto(venAmt) .. "|r"
-    end
-    if ahText ~= "" and vendorText ~= "" then
-        f._priceTop:SetText(ahText)
-        f._priceMid:SetText(vendorText)
-    elseif ahText ~= "" then
-        f._priceTop:SetText("")
-        f._priceMid:SetText(ahText)
-    else
-        f._priceTop:SetText("")
-        f._priceMid:SetText(vendorText)
-    end
+    RefreshPriceDisplay(f, entry)
 
     local target  = entry.playerNameFull or entry.playerName
     local display = entry.playerName
@@ -1106,17 +1107,15 @@ function Feed:AddEntry(entry)
     local f = AcquireRow(feedFrame)
     f:SetWidth((db.feedWidth or 280) - PAD_SIDE * 2)
     f:SetHeight(db.feedRowHeight or ROW_H)
-    f:SetAlpha(1); f:Show()
     entry.count = entry.count or 1
     if entry.isPreview and db.showAHPrice and entry.link and not entry.ahPrice then
         local skipAH = (entry.canAH == false) or (not db.showJunkAH and (entry.rarity or 1) == 0)
         if not skipAH then
-            C_Timer.After(0.1, function()
-                local ahv = LLF.Price:GetAHValue(entry.link)
-                if ahv then entry.ahPrice = ahv end
-            end)
+            local ahv = LLF.Price:GetAHValue(entry.link)
+            if ahv then entry.ahPrice = ahv end
         end
     end
+    f:SetAlpha(1); f:Show()
     PopulateRow(f, entry)
 
     local record = { entry=entry, rowFrame=f, expiresAt=GetTime()+dur, fadeStart=nil }
@@ -1124,6 +1123,18 @@ function Feed:AddEntry(entry)
     PositionAllRows()
     if wasEmpty then feedFrame:SetScript("OnUpdate", FeedOnUpdate) end
 
+    if entry.isPreview and db.showAHPrice and entry.link and not entry.ahPrice then
+        local skipAH = (entry.canAH == false) or (not db.showJunkAH and (entry.rarity or 1) == 0)
+        if not skipAH then
+            C_Timer.After(0.1, function()
+                local ahv = LLF.Price:GetAHValue(entry.link)
+                if ahv then
+                    record.entry.ahPrice = ahv
+                    if record.rowFrame:IsShown() then RefreshPriceDisplay(record.rowFrame, record.entry) end
+                end
+            end)
+        end
+    end
     if db.showAHPrice and entry.link and not entry.ahPrice then
         local skipAH = (entry.canAH == false)
             or (not db.showJunkAH and (entry.rarity or 1) == 0)
@@ -1133,7 +1144,7 @@ function Feed:AddEntry(entry)
                 local ahv = LLF.Price:GetAHValue(entry.link)
                 if ahv then
                     record.entry.ahPrice = ahv
-                    if record.rowFrame:IsShown() then PopulateRow(record.rowFrame, record.entry) end
+                    if record.rowFrame:IsShown() then RefreshPriceDisplay(record.rowFrame, record.entry) end
                 end
             end)
         end
@@ -1300,7 +1311,7 @@ function Feed:Preview()
         { icon=133784,  name="Money",                       rarity=1, source=1,            isGear=false, price=2345678,                                                  mergeKey="pv3", isPreview=true },
         { icon=463446,  name="Timewarped Badge",            rarity=6, source=2, count=40,  isGear=false, price=0,       append=" (2000)",                                mergeKey="pv4", isPreview=true },
         { icon=1455894, name="Honor",                       rarity=8, source=7, count=250, isGear=false, price=0,                                                        mergeKey="pv5", isPreview=true },
-        { icon=4638563, name="Void-Touched Wristguard",    rarity=4, source=3, ilvl=639,  isGear=true,  price=85000,   isUpgrade=true,   subType="Plate",               mergeKey="pv6", isPreview=true, upgradeTrackTier=4,
+        { icon=4638563, name="Void-Touched Wristguard",    rarity=4, source=3, ilvl=639,  isGear=true,  price=85000,   isUpgrade=true,   isTransmog=true,  subType="Plate",               mergeKey="pv6", isPreview=true, upgradeTrackTier=4,
           link="item:133632" },
         { icon=132261,  name="Reins of the Raven Lord",      rarity=4, source=3, count=1,   isGear=false, price=0,                           subType="Mount",               mergeKey="pv7", isPreview=true, itemCategory="mount",
           link="item:32768" },
@@ -1513,9 +1524,16 @@ function PFeed:AddEntry(entry)
     local prh = pdf.feedRowHeight or ROW_H
     f:SetWidth(pw - PAD_SIDE * 2)
     f:SetHeight(prh)
-    f:SetAlpha(1); f:Show()
     entry.count = entry.count or 1
+    if entry.isPreview and db.showAHPrice and entry.link and not entry.ahPrice then
+        local skipAH = (entry.canAH == false) or (not db.showJunkAH and (entry.rarity or 1) == 0)
+        if not skipAH then
+            local ahv = LLF.Price:GetAHValue(entry.link)
+            if ahv then entry.ahPrice = ahv end
+        end
+    end
     PopulateRow(f, entry)
+    f:SetAlpha(1); f:Show()
 
     local record = { entry=entry, rowFrame=f, expiresAt=GetTime()+dur, fadeStart=nil }
     table.insert(partyRows, 1, record)
@@ -1529,7 +1547,7 @@ function PFeed:AddEntry(entry)
                 local ahv = LLF.Price:GetAHValue(entry.link)
                 if ahv then
                     record.entry.ahPrice = ahv
-                    if record.rowFrame:IsShown() then PopulateRow(record.rowFrame, record.entry) end
+                    if record.rowFrame:IsShown() then RefreshPriceDisplay(record.rowFrame, record.entry) end
                 end
             end)
         end
@@ -1543,7 +1561,7 @@ function PFeed:AddEntry(entry)
                 local ahv = LLF.Price:GetAHValue(entry.link)
                 if ahv then
                     record.entry.ahPrice = ahv
-                    if record.rowFrame:IsShown() then PopulateRow(record.rowFrame, record.entry) end
+                    if record.rowFrame:IsShown() then RefreshPriceDisplay(record.rowFrame, record.entry) end
                 end
             end)
         end
