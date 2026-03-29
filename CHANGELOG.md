@@ -1,5 +1,17 @@
 # Larlen Loot Frame Changelog
 
+## v1.2.0
+- Added new Font section with font size offset slider - can be configured separately for personal and group feeds
+- Added font outline picker for personal and group feeds
+- Added colour pickers for row elements (item level, sockets, tertiary stats, owned count, and more) - can be set per feed
+- Moved group feed player name colour to the Font section; custom colour can now be set when class colouring is off
+- Added scale slider (0–200%) for personal and group feeds
+- Row background opacity now also applies to the whisper and offer (G/W) buttons
+- Removed "Minimum Rarity to Show" from group loot - rarity is already managed through the Filters tab
+- Added "Show upgrade track icon" toggle to the group loot Indicators section, same as personal loot
+- Renamed the "Need?" whisper button toggle to "Show message buttons to ask for items you want"
+- Reworked message input layout for "Offer in Group" and "Need?" - label and box now on the same line, hints moved next to Reset Message button
+
 ## v1.1.3
 - Added class colour coding for player names in the group loot feed, with a toggle to disable it
 

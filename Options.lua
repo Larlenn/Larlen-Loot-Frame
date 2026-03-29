@@ -500,6 +500,16 @@ local function FontItems()
     return items
 end
 
+local function OutlineItems()
+    return {
+        { value = "",                   display = "None" },
+        { value = "OUTLINE",            display = "Outline" },
+        { value = "THICKOUTLINE",       display = "Thick Outline" },
+        { value = "MONOCHROME",         display = "Monochrome" },
+        { value = "OUTLINE,MONOCHROME", display = "Outline + Monochrome" },
+    }
+end
+
 local function SoundItems()
     return LLF:GetSoundList()
 end
@@ -724,17 +734,6 @@ local function PageGeneral(parent, CW)
     p.Row("Show minimap icon",
         function() return LLF.db.showMinimap ~= false end,
         function(v) LLF.db.showMinimap = v; LLF.Minimap:ApplyVisibility() end)
-
-    p.Header("Font")
-    p.Picker("", 24,
-        function() return LLF.db.feedFont or "" end,
-        function(v)
-            LLF.db.feedFont = v
-            LLF.Feed:ApplyFont()
-            if LLF.PartyFeed then LLF.PartyFeed:ApplyFont() end
-            LLF.Feed:RefreshTestRows(); LLF.PartyFeed:RefreshTestRows()
-        end,
-        FontItems)
 
     p.Header("Item Info")
     p.RowL("Show item level for gear",
@@ -992,15 +991,6 @@ local function PageGeneral(parent, CW)
         p.SetY(bcy - ROW_H - p.SEP)
     end
 
-    p.Sep(4)
-    p.SlideInput("Max name length", 10, 60, 1,
-        function() return LLF.db.maxNameLength or 32 end,
-        function(v)
-            LLF.db.maxNameLength = v
-            LLF.Feed:ApplyFont()
-            if LLF.PartyFeed then LLF.PartyFeed:ApplyFont() end
-            LLF.Feed:RefreshTestRows(); LLF.PartyFeed:RefreshTestRows()
-        end)
     p.Finalize()
 end
 
@@ -1047,6 +1037,9 @@ local function PageLayout(parent, CW)
     p.SlideInputR("Max rows visible", 1, 20, 1,
         function() return LLF.db.feedMaxRows or 10 end,
         function(v) LLF.db.feedMaxRows = v; LLF.Feed:RefreshRows(); LLF.Feed:ApplyFont() end)
+    p.SlideInput("Scale", 0, 200, 5,
+        function() return math.floor((LLF.db.feedScale or 1.0) * 100 + 0.5) end,
+        function(v) LLF.db.feedScale = v / 100; LLF.Feed:ApplyLayout() end)
 
     p.Header("Stack Count Position")
     p.Picker("", 22,
@@ -1190,12 +1183,15 @@ local function PageLayout(parent, CW)
             }
         end)
 
-    p.Sep(18)
+    p.Sep(6)
     local y2 = p.GetY()
+    local offerLbl = parent:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    offerLbl:SetPoint("TOPLEFT", parent, "TOPLEFT", p.PAD, y2 - 6)
+    offerLbl:SetText("|cffaabbccMessage to send:|r")
     local oCont = CreateFrame("Frame", N("OF_EC"), parent, "BackdropTemplate")
     oCont:SetHeight(26)
-    oCont:SetPoint("TOPLEFT",  parent, p.PAD,  y2)
-    oCont:SetPoint("TOPRIGHT", parent, -p.PAD, y2)
+    oCont:SetPoint("TOPLEFT",  parent, "TOPLEFT",  p.PAD + 134, y2)
+    oCont:SetPoint("TOPRIGHT", parent, "TOPRIGHT", -p.PAD,       y2)
     oCont:SetBackdrop(FLAT_BD)
 
     local function UpdateOfferContColors()
@@ -1204,11 +1200,6 @@ local function PageLayout(parent, CW)
         oCont:SetBackdropBorderColor(ACCENT[1], ACCENT[2], ACCENT[3], on and 0.45 or 0.15)
     end
     UpdateOfferContColors()
-
-    local offerHintFS = parent:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-    offerHintFS:SetPoint("BOTTOMLEFT", oCont, "TOPLEFT", 0, 2)
-    offerHintFS:SetTextColor(0.55, 0.55, 0.60, 1)
-    offerHintFS:SetText("{item} = item link")
 
     local offerEB = CreateFrame("EditBox", N("OF_EB"), oCont)
     offerEB:SetPoint("TOPLEFT",     oCont, 6,  -4)
@@ -1265,12 +1256,17 @@ local function PageLayout(parent, CW)
     p.SetY(y2 - 26 - SEP)
 
     local offerResetBtn = MakeBtn(parent, "Reset Message", 120, ROW_H)
-    offerResetBtn:SetPoint("TOPLEFT", parent, p.PAD, p.GetY())
+    local btnY2 = p.GetY()
+    offerResetBtn:SetPoint("TOPLEFT", parent, p.PAD, btnY2)
     offerResetBtn:SetScript("OnClick", function()
         LLF.db.offerMessage = "Anyone want my {item}?"
         offerEB:SetText(LLF.db.offerMessage)
     end)
-    p.SetY(p.GetY() - ROW_H - SEP)
+    local offerHintFS = parent:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    offerHintFS:SetPoint("TOPRIGHT", parent, "TOPRIGHT", -p.PAD, btnY2 - 5)
+    offerHintFS:SetText("|cff888899{item} = item link|r")
+    offerHintFS:SetJustifyH("RIGHT")
+    p.SetY(btnY2 - ROW_H - SEP)
 
     p.Finalize()
 end
@@ -1777,20 +1773,6 @@ local function PagePartyFeed(parent, CW)
     ggSentinel.Sync = function() SyncGroupGate() end
     allToggles[#allToggles + 1] = ggSentinel
 
-    p.Header("Minimum Rarity to Show")
-    p.Picker("", 24,
-        function() return pdf().filterMinRarity or 0 end,
-        function(v) pdf().filterMinRarity = v end,
-        function()
-            return {
-                { value = 0, display = "All items"                                          },
-                { value = 2, display = "|cff1eff00Uncommon|r|cffffffff and above|r"        },
-                { value = 3, display = "|cff0070ddRare|r|cffffffff and above|r"            },
-                { value = 4, display = "|cffa335eeEpic|r|cffffffff and above|r"            },
-                { value = 5, display = "|cffff8000Legendary|r|cffffffff only|r"            },
-            }
-        end)
-
     p.Header("Growth Direction")
     p.Sep(2)
     p.Label("New entries appear:")
@@ -1818,6 +1800,9 @@ local function PagePartyFeed(parent, CW)
     p.SlideInputR("Max rows visible", 1, 20, 1,
         function() return pdf().feedMaxRows or 8 end,
         function(v) pdf().feedMaxRows = v; LLF.PartyFeed:RefreshRows(); LLF.PartyFeed:ApplyFont(); LLF.PartyFeed:RefreshTestRows() end)
+    p.SlideInput("Scale", 0, 200, 5,
+        function() return math.floor((pdf().feedScale or 1.0) * 100 + 0.5) end,
+        function(v) pdf().feedScale = v / 100; LLF.PartyFeed:ApplyLayout() end)
 
     p.Header("Opacity")
     p.SlideInputL("Feed opacity", 0, 100, 5,
@@ -1846,6 +1831,7 @@ local function PagePartyFeed(parent, CW)
             pdf.feedMaxRows   = db.feedMaxRows
             pdf.feedGrowUp    = db.feedGrowUp
             pdf.feedAlpha     = db.feedAlpha
+            pdf.feedScale     = db.feedScale
             pdf.feedBgAlpha   = db.feedBgAlpha
             pdf.rowBgAlpha    = db.rowBgAlpha
             pdf.fadeOutTime   = db.fadeOutTime
@@ -1860,7 +1846,7 @@ local function PagePartyFeed(parent, CW)
             GameTooltip:AddLine(" ", 1, 1, 1)
             GameTooltip:AddLine("• Feed width, Row height, Row spacing", 0.9, 0.9, 0.9, true)
             GameTooltip:AddLine("• Max rows, Growth direction", 0.9, 0.9, 0.9, true)
-            GameTooltip:AddLine("• Feed opacity, Frame background, Row background", 0.9, 0.9, 0.9, true)
+            GameTooltip:AddLine("• Scale, Feed opacity, Frame background, Row background", 0.9, 0.9, 0.9, true)
             GameTooltip:AddLine("• Fade-out time", 0.9, 0.9, 0.9, true)
             GameTooltip:Show()
         end)
@@ -1932,16 +1918,15 @@ local function PagePartyFeed(parent, CW)
             if LLF.PartyFeed then LLF.PartyFeed:ApplyFont() end
             LLF.PartyFeed:RefreshTestRows()
         end)
-    p.Row("Color player names by class",
-        function() return LLF.db.partyFeed.showClassColors ~= false end,
+    p.Row("Show upgrade track icon",
+        function() return LLF.db.partyFeed.showUpgradeTrackParty == true end,
         function(v)
-            LLF.db.partyFeed.showClassColors = v
+            LLF.db.partyFeed.showUpgradeTrackParty = v
             if LLF.PartyFeed then LLF.PartyFeed:ApplyFont() end
             LLF.PartyFeed:RefreshTestRows()
         end)
-
     p.Header("Need?")
-    local whisperToggle = p.Row("Show message buttons for items others may need",
+    local whisperToggle = p.Row("Show message buttons to ask for items you want",
         function() return LLF.db.showWhisperButtons ~= false end,
         function(v)
             LLF.db.showWhisperButtons = v
@@ -1949,19 +1934,16 @@ local function PagePartyFeed(parent, CW)
             LLF.Feed:RefreshTestRows(); LLF.PartyFeed:RefreshTestRows()
         end)
 
-    p.Sep(2)
-    p.Sep(18)
+    p.Sep(6)
     local y0 = p.GetY()
+    local needLbl = parent:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    needLbl:SetPoint("TOPLEFT", parent, "TOPLEFT", p.PAD, y0 - 6)
+    needLbl:SetText("|cffaabbccMessage to send:|r")
     local cont = CreateFrame("Frame", N("NB_EC"), parent, "BackdropTemplate")
     cont:SetHeight(26)
-    cont:SetPoint("TOPLEFT",  parent, p.PAD,  y0)
-    cont:SetPoint("TOPRIGHT", parent, -p.PAD, y0)
+    cont:SetPoint("TOPLEFT",  parent, "TOPLEFT",  p.PAD + 134, y0)
+    cont:SetPoint("TOPRIGHT", parent, "TOPRIGHT", -p.PAD,       y0)
     cont:SetBackdrop(FLAT_BD)
-
-    local hintFS = parent:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-    hintFS:SetPoint("BOTTOMLEFT",  cont, "TOPLEFT",  0,  2)
-    hintFS:SetTextColor(0.55, 0.55, 0.60, 1)
-    hintFS:SetText("{name} = player name   {item} = item link")
 
     local function UpdateContColors()
         local enabled = LLF.db.showWhisperButtons ~= false
@@ -2044,13 +2026,443 @@ local function PagePartyFeed(parent, CW)
     p.SetY(y0 - 26 - SEP)
 
     local resetBtn = MakeBtn(parent, "Reset Message", 120, ROW_H)
-    resetBtn:SetPoint("TOPLEFT", parent, p.PAD, p.GetY())
+    local btnY0 = p.GetY()
+    resetBtn:SetPoint("TOPLEFT", parent, p.PAD, btnY0)
     resetBtn:SetScript("OnClick", function()
         LLF.db.needMessage = "{name}, do you need {item}?"
         msgEB:SetText(LLF.db.needMessage)
         if LLF.PartyFeed then LLF.PartyFeed:ApplyFont() end
     end)
-    p.SetY(p.GetY() - ROW_H - SEP)
+    local needHintFS = parent:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    needHintFS:SetPoint("TOPRIGHT", parent, "TOPRIGHT", -p.PAD, btnY0 - 5)
+    needHintFS:SetText("|cff888899{name} = player name     {item} = item link|r")
+    needHintFS:SetJustifyH("RIGHT")
+    p.SetY(btnY0 - ROW_H - SEP)
+
+    p.Finalize()
+end
+
+local function PageFont(parent, CW)
+    local p = MakePage(parent, CW)
+
+    local function MakePerFeedPicker(label, hPx,
+        getGlobal, setGlobal,
+        getPerFeed, setPerFeed,
+        getPersonal, setPersonal,
+        getGroup, setGroup,
+        itemsFn)
+
+        local yPreH = p.GetY()
+        p.Header(label)
+        local btnG = MakeBtn(parent, "Global",   62, SEC_H - 2)
+        local btnP = MakeBtn(parent, "Per feed", 62, SEC_H - 2)
+        btnP:SetPoint("TOPRIGHT", parent, -p.PAD,     yPreH - 6)
+        btnG:SetPoint("TOPRIGHT", btnP,   "TOPLEFT", -4,        0)
+
+        local y0     = p.GetY()
+        local SLIM_H = 24
+        local FULL_H = 38
+        local pkG = MakeListPicker(parent, "", SLIM_H, getGlobal, setGlobal, itemsFn)
+        pkG:SetPoint("TOPLEFT",  parent, p.PAD,  y0)
+        pkG:SetPoint("TOPRIGHT", parent, -p.PAD, y0)
+        local pkL = MakeListPicker(parent, "Personal", FULL_H, getPersonal, setPersonal, itemsFn)
+        pkL:SetPoint("TOPLEFT",  parent, p.PAD, y0)
+        pkL:SetWidth(p.HALF)
+        local pkR = MakeListPicker(parent, "Group", FULL_H, getGroup, setGroup, itemsFn)
+        pkR:SetPoint("TOPLEFT",  parent, p.PAD + p.HALF + 8, y0)
+        pkR:SetPoint("TOPRIGHT", parent, -p.PAD, y0)
+        p.SetY(y0 - FULL_H - p.SEP)
+        pkL:Hide(); pkR:Hide()
+
+        local function SetActive(btn, active)
+            if active then
+                btn:SetBackdropBorderColor(ACCENT[1], ACCENT[2], ACCENT[3], 1)
+                btn:SetBackdropColor(ACCENT[1]*0.18, ACCENT[2]*0.18, ACCENT[3]*0.18, 1)
+                btn._fs:SetTextColor(WHITE[1], WHITE[2], WHITE[3], 1)
+            else
+                btn:SetBackdropBorderColor(ACCENT[1], ACCENT[2], ACCENT[3], 0.30)
+                btn:SetBackdropColor(BTN_BG[1], BTN_BG[2], BTN_BG[3], BTN_BG[4])
+                btn._fs:SetTextColor(ACCENT[1], ACCENT[2], ACCENT[3], 0.55)
+            end
+        end
+
+        local function Sync()
+            local perFeed = getPerFeed()
+            if perFeed then
+                pkG:Hide(); pkL:Show(); pkR:Show()
+                if pkL._refresh then pkL._refresh() end
+                if pkR._refresh then pkR._refresh() end
+            else
+                pkG:Show(); pkL:Hide(); pkR:Hide()
+                if pkG._refresh then pkG._refresh() end
+            end
+            SetActive(btnG, not perFeed)
+            SetActive(btnP, perFeed)
+        end
+        Sync()
+        allToggles[#allToggles + 1] = { Sync = Sync }
+
+        local function Apply()
+            LLF.Feed:ApplyFont()
+            if LLF.PartyFeed then LLF.PartyFeed:ApplyFont() end
+            LLF.Feed:RefreshTestRows(); LLF.PartyFeed:RefreshTestRows()
+        end
+
+        btnG:SetScript("OnClick", function()
+            if not getPerFeed() then return end
+            setPerFeed(false); Sync(); Apply()
+        end)
+        btnP:SetScript("OnClick", function()
+            if getPerFeed() then return end
+            setPerFeed(true); Sync(); Apply()
+        end)
+        btnG:SetScript("OnLeave", function() SetActive(btnG, not getPerFeed()) end)
+        btnP:SetScript("OnLeave", function() SetActive(btnP, getPerFeed()) end)
+    end
+
+    local function MakePerFeedColor(label,
+        getGlobal, setGlobal,
+        getPerFeed, setPerFeed,
+        getPersonal, setPersonal,
+        getGroup, setGroup,
+        applyFn)
+
+        local DEF = { 0.70, 0.70, 0.75, 1 }
+
+        local function MakeSwatch(getColor, onChange, fallbackFn)
+            local sw = CreateFrame("Button", N("SW"), parent, "BackdropTemplate")
+            sw:SetSize(22, 22)
+            sw:SetBackdrop(FLAT_BD)
+            sw:SetBackdropBorderColor(0.5, 0.5, 0.5, 0.8)
+            local function Sync()
+                local c = getColor() or (fallbackFn and fallbackFn()) or DEF
+                sw:SetBackdropColor(c[1], c[2], c[3], 1)
+            end
+            Sync()
+            allToggles[#allToggles + 1] = { Sync = Sync }
+            sw:SetScript("OnClick", function()
+                local c = getColor() or (fallbackFn and fallbackFn()) or DEF
+                local defC = (fallbackFn and fallbackFn()) or DEF
+                if ColorPPDefault then
+                    ColorPPDefault.colors = { r = defC[1], g = defC[2], b = defC[3], a = 1 }
+                end
+                local info = {
+                    r = c[1], g = c[2], b = c[3],
+                    swatchFunc = function()
+                        local r, g, b = ColorPickerFrame:GetColorRGB()
+                        onChange({ r, g, b, 1 }); Sync()
+                    end,
+                    cancelFunc = function(prev)
+                        onChange({ prev.r, prev.g, prev.b, 1 }); Sync()
+                    end,
+                    defaultFunc = function()
+                        onChange(nil); Sync()
+                    end,
+                }
+                ColorPickerFrame:SetupColorPickerAndShow(info)
+            end)
+            sw:SetScript("OnEnter", function(s) s:SetBackdropBorderColor(1, 1, 1, 1) end)
+            sw:SetScript("OnLeave", function(s) s:SetBackdropBorderColor(0.5, 0.5, 0.5, 0.8) end)
+            return sw
+        end
+
+        local yPreH = p.GetY()
+        p.Header(label)
+        local btnG = MakeBtn(parent, "Global",   62, SEC_H - 2)
+        local btnP = MakeBtn(parent, "Per feed", 62, SEC_H - 2)
+        btnP:SetPoint("TOPRIGHT", parent, -p.PAD,     yPreH - 6)
+        btnG:SetPoint("TOPRIGHT", btnP,   "TOPLEFT", -4,        0)
+
+        local y0 = p.GetY()
+
+        local lblG = parent:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+        lblG:SetPoint("TOPLEFT", parent, p.PAD, y0 - 2)
+        lblG:SetText("Colour")
+        lblG:SetTextColor(WHITE[1], WHITE[2], WHITE[3], 0.80)
+        local swG = MakeSwatch(getGlobal, function(c) setGlobal(c); applyFn() end)
+        swG:SetPoint("LEFT", lblG, "RIGHT", 10, 2)
+
+        local lblL = parent:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+        lblL:SetPoint("TOPLEFT", parent, p.PAD, y0 - 2)
+        lblL:SetText("Personal")
+        lblL:SetTextColor(WHITE[1], WHITE[2], WHITE[3], 0.80)
+        local swL = MakeSwatch(getPersonal, function(c) setPersonal(c); applyFn() end)
+        swL:SetPoint("LEFT", lblL, "RIGHT", 10, 2)
+
+        local lblR = parent:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+        lblR:SetPoint("LEFT", swL, "RIGHT", 16, 0)
+        lblR:SetText("Group")
+        lblR:SetTextColor(WHITE[1], WHITE[2], WHITE[3], 0.80)
+        local swR = MakeSwatch(getGroup, function(c) setGroup(c); applyFn() end, getPersonal)
+        swR:SetPoint("LEFT", lblR, "RIGHT", 10, 0)
+
+        p.SetY(y0 - ROW_H - p.SEP)
+
+        local function SetActive(btn, active)
+            if active then
+                btn:SetBackdropBorderColor(ACCENT[1], ACCENT[2], ACCENT[3], 1)
+                btn:SetBackdropColor(ACCENT[1]*0.18, ACCENT[2]*0.18, ACCENT[3]*0.18, 1)
+                btn._fs:SetTextColor(WHITE[1], WHITE[2], WHITE[3], 1)
+            else
+                btn:SetBackdropBorderColor(ACCENT[1], ACCENT[2], ACCENT[3], 0.30)
+                btn:SetBackdropColor(BTN_BG[1], BTN_BG[2], BTN_BG[3], BTN_BG[4])
+                btn._fs:SetTextColor(ACCENT[1], ACCENT[2], ACCENT[3], 0.55)
+            end
+        end
+
+        local function Sync()
+            local perFeed = getPerFeed()
+            if perFeed then
+                lblG:Hide(); swG:Hide()
+                lblL:Show(); swL:Show(); lblR:Show(); swR:Show()
+            else
+                lblG:Show(); swG:Show()
+                lblL:Hide(); swL:Hide(); lblR:Hide(); swR:Hide()
+            end
+            SetActive(btnG, not perFeed)
+            SetActive(btnP, perFeed)
+        end
+        Sync()
+        allToggles[#allToggles + 1] = { Sync = Sync }
+
+        btnG:SetScript("OnClick", function()
+            if not getPerFeed() then return end
+            setPerFeed(false); Sync(); applyFn()
+        end)
+        btnP:SetScript("OnClick", function()
+            if getPerFeed() then return end
+            setPerFeed(true); Sync(); applyFn()
+        end)
+        btnG:SetScript("OnLeave", function() SetActive(btnG, not getPerFeed()) end)
+        btnP:SetScript("OnLeave", function() SetActive(btnP, getPerFeed()) end)
+    end
+
+    local function ApplyFont()
+        LLF.Feed:ApplyFont()
+        if LLF.PartyFeed then LLF.PartyFeed:ApplyFont() end
+        LLF.Feed:RefreshTestRows(); LLF.PartyFeed:RefreshTestRows()
+    end
+
+    MakePerFeedPicker("Font Family", 38,
+        function() return LLF.db.feedFont or "" end,
+        function(v) LLF.db.feedFont = v; LLF.Feed:ApplyFont(); if LLF.PartyFeed then LLF.PartyFeed:ApplyFont() end; LLF.Feed:RefreshTestRows(); LLF.PartyFeed:RefreshTestRows() end,
+        function() return LLF.db.fontFamilyPerFeed == true end,
+        function(v) LLF.db.fontFamilyPerFeed = v end,
+        function() return LLF.db.feedFont or "" end,
+        function(v) LLF.db.feedFont = v; LLF.Feed:ApplyFont(); if LLF.PartyFeed then LLF.PartyFeed:ApplyFont() end; LLF.Feed:RefreshTestRows(); LLF.PartyFeed:RefreshTestRows() end,
+        function() return (LLF.db.partyFeed and LLF.db.partyFeed.feedFont) or "" end,
+        function(v) LLF.db.partyFeed.feedFont = v; if LLF.PartyFeed then LLF.PartyFeed:ApplyFont() end; LLF.PartyFeed:RefreshTestRows() end,
+        FontItems)
+
+    MakePerFeedPicker("Font Outline", 38,
+        function() return LLF.db.fontOutline or "" end,
+        function(v) LLF.db.fontOutline = v; LLF.Feed:ApplyFont(); if LLF.PartyFeed then LLF.PartyFeed:ApplyFont() end; LLF.Feed:RefreshTestRows(); LLF.PartyFeed:RefreshTestRows() end,
+        function() return LLF.db.fontOutlinePerFeed == true end,
+        function(v) LLF.db.fontOutlinePerFeed = v end,
+        function() return LLF.db.fontOutline or "" end,
+        function(v) LLF.db.fontOutline = v; LLF.Feed:ApplyFont(); if LLF.PartyFeed then LLF.PartyFeed:ApplyFont() end; LLF.Feed:RefreshTestRows(); LLF.PartyFeed:RefreshTestRows() end,
+        function() return (LLF.db.partyFeed and LLF.db.partyFeed.fontOutline) or "" end,
+        function(v) LLF.db.partyFeed.fontOutline = v; if LLF.PartyFeed then LLF.PartyFeed:ApplyFont() end; LLF.PartyFeed:RefreshTestRows() end,
+        OutlineItems)
+
+    local function MakePerFeedSlider(label, lo, hi, step,
+        getGlobal, setGlobal,
+        getPerFeed, setPerFeed,
+        getPersonal, setPersonal,
+        getGroup, setGroup)
+
+        local yPreH = p.GetY()
+        p.Header(label)
+        local btnG = MakeBtn(parent, "Global",   62, SEC_H - 2)
+        local btnP = MakeBtn(parent, "Per feed", 62, SEC_H - 2)
+        btnP:SetPoint("TOPRIGHT", parent, -p.PAD,      yPreH - 6)
+        btnG:SetPoint("TOPRIGHT", btnP,   "TOPLEFT",  -4,        0)
+
+        local y0  = p.GetY()
+        local slG = p.SlideInput("", lo, hi, step, getGlobal, setGlobal)
+        p.SetY(y0)
+        local slL = p.SlideInputL("Personal", lo, hi, step, getPersonal, setPersonal)
+        local slR = p.SlideInputR("Group",    lo, hi, step, getGroup,    setGroup)
+
+        local function SetActive(btn, active)
+            if active then
+                btn:SetBackdropBorderColor(ACCENT[1], ACCENT[2], ACCENT[3], 1)
+                btn:SetBackdropColor(ACCENT[1]*0.18, ACCENT[2]*0.18, ACCENT[3]*0.18, 1)
+                btn._fs:SetTextColor(WHITE[1], WHITE[2], WHITE[3], 1)
+            else
+                btn:SetBackdropBorderColor(ACCENT[1], ACCENT[2], ACCENT[3], 0.30)
+                btn:SetBackdropColor(BTN_BG[1], BTN_BG[2], BTN_BG[3], BTN_BG[4])
+                btn._fs:SetTextColor(ACCENT[1], ACCENT[2], ACCENT[3], 0.55)
+            end
+        end
+
+        local function Sync()
+            local perFeed = getPerFeed()
+            if perFeed then
+                slG:Hide(); slL:Show(); slR:Show()
+                if slL._refresh then slL._refresh() end
+                if slR._refresh then slR._refresh() end
+            else
+                slG:Show(); slL:Hide(); slR:Hide()
+                if slG._refresh then slG._refresh() end
+            end
+            SetActive(btnG, not perFeed)
+            SetActive(btnP, perFeed)
+        end
+        Sync()
+        allToggles[#allToggles + 1] = { Sync = Sync }
+
+        local function Apply()
+            LLF.Feed:ApplyFont()
+            if LLF.PartyFeed then LLF.PartyFeed:ApplyFont() end
+            LLF.Feed:RefreshTestRows(); LLF.PartyFeed:RefreshTestRows()
+        end
+
+        btnG:SetScript("OnClick", function()
+            if not getPerFeed() then return end
+            setPerFeed(false); Sync(); Apply()
+        end)
+        btnP:SetScript("OnClick", function()
+            if getPerFeed() then return end
+            setPerFeed(true); Sync(); Apply()
+        end)
+        btnG:SetScript("OnLeave", function() SetActive(btnG, not getPerFeed()) end)
+        btnP:SetScript("OnLeave", function() SetActive(btnP, getPerFeed()) end)
+    end
+
+    MakePerFeedSlider("Font Size Offset", -6, 10, 1,
+        function() return LLF.db.fontSizeOffset or 0 end,
+        function(v) LLF.db.fontSizeOffset = v; LLF.Feed:ApplyFont(); if LLF.PartyFeed then LLF.PartyFeed:ApplyFont() end; LLF.Feed:RefreshTestRows(); LLF.PartyFeed:RefreshTestRows() end,
+        function() return LLF.db.fontSizePerFeed == true end,
+        function(v) LLF.db.fontSizePerFeed = v end,
+        function() return LLF.db.fontSizeOffset or 0 end,
+        function(v) LLF.db.fontSizeOffset = v; LLF.Feed:ApplyFont(); if LLF.PartyFeed then LLF.PartyFeed:ApplyFont() end; LLF.Feed:RefreshTestRows(); LLF.PartyFeed:RefreshTestRows() end,
+        function() return (LLF.db.partyFeed and LLF.db.partyFeed.fontSizeOffset) or 0 end,
+        function(v) LLF.db.partyFeed.fontSizeOffset = v; if LLF.PartyFeed then LLF.PartyFeed:ApplyFont() end; LLF.PartyFeed:RefreshTestRows() end)
+
+    MakePerFeedSlider("Max Name Length", 10, 60, 1,
+        function() return LLF.db.maxNameLength or 32 end,
+        function(v) LLF.db.maxNameLength = v; LLF.Feed:ApplyFont(); if LLF.PartyFeed then LLF.PartyFeed:ApplyFont() end; LLF.Feed:RefreshTestRows(); LLF.PartyFeed:RefreshTestRows() end,
+        function() return LLF.db.maxNameLengthPerFeed == true end,
+        function(v) LLF.db.maxNameLengthPerFeed = v end,
+        function() return LLF.db.maxNameLength or 32 end,
+        function(v) LLF.db.maxNameLength = v; LLF.Feed:ApplyFont(); if LLF.PartyFeed then LLF.PartyFeed:ApplyFont() end; LLF.Feed:RefreshTestRows(); LLF.PartyFeed:RefreshTestRows() end,
+        function() return (LLF.db.partyFeed and LLF.db.partyFeed.maxNameLength) or 32 end,
+        function(v) LLF.db.partyFeed.maxNameLength = v; if LLF.PartyFeed then LLF.PartyFeed:ApplyFont() end; LLF.PartyFeed:RefreshTestRows() end)
+
+    do
+        local DEF_PNAME = { 0.60, 0.80, 1.0, 1 }
+        p.Header("Player Name Colour  (Group Feed)")
+        local SyncSwatch
+        local classRow = p.Row("Color by class",
+            function() return LLF.db.partyFeed.showClassColors ~= false end,
+            function(v)
+                LLF.db.partyFeed.showClassColors = v
+                if LLF.PartyFeed then LLF.PartyFeed:ApplyFont() end
+                LLF.PartyFeed:RefreshTestRows()
+                if SyncSwatch then SyncSwatch() end
+            end)
+
+        local swY = p.GetY()
+        local swLbl = parent:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+        swLbl:SetPoint("TOPLEFT", parent, p.PAD, swY - 2)
+        swLbl:SetText("Custom colour")
+        swLbl:SetTextColor(WHITE[1], WHITE[2], WHITE[3], 0.80)
+        local sw = CreateFrame("Button", N("SW"), parent, "BackdropTemplate")
+        sw:SetSize(22, 22)
+        sw:SetBackdrop(FLAT_BD)
+        sw:SetBackdropBorderColor(0.5, 0.5, 0.5, 0.8)
+        sw:SetPoint("LEFT", swLbl, "RIGHT", 10, 2)
+        SyncSwatch = function()
+            local c = LLF.db.partyFeed.playerNameColor or DEF_PNAME
+            sw:SetBackdropColor(c[1], c[2], c[3], 1)
+            local hide = LLF.db.partyFeed.showClassColors ~= false
+            swLbl:SetShown(not hide); sw:SetShown(not hide)
+        end
+        SyncSwatch()
+        allToggles[#allToggles + 1] = { Sync = SyncSwatch }
+        sw:SetScript("OnClick", function()
+            local c = LLF.db.partyFeed.playerNameColor or DEF_PNAME
+            if ColorPPDefault then
+                ColorPPDefault.colors = { r = DEF_PNAME[1], g = DEF_PNAME[2], b = DEF_PNAME[3], a = 1 }
+            end
+            local info = {
+                r = c[1], g = c[2], b = c[3],
+                swatchFunc = function()
+                    local r, g, b = ColorPickerFrame:GetColorRGB()
+                    LLF.db.partyFeed.playerNameColor = { r, g, b, 1 }
+                    SyncSwatch(); ApplyFont()
+                end,
+                cancelFunc = function(prev)
+                    LLF.db.partyFeed.playerNameColor = { prev.r, prev.g, prev.b, 1 }
+                    SyncSwatch(); ApplyFont()
+                end,
+                defaultFunc = function()
+                    LLF.db.partyFeed.playerNameColor = nil
+                    SyncSwatch(); ApplyFont()
+                end,
+            }
+            ColorPickerFrame:SetupColorPickerAndShow(info)
+        end)
+        sw:SetScript("OnEnter", function(s) s:SetBackdropBorderColor(1, 1, 1, 1) end)
+        sw:SetScript("OnLeave", function(s) s:SetBackdropBorderColor(0.5, 0.5, 0.5, 0.8) end)
+        p.SetY(swY - ROW_H - p.SEP)
+    end
+
+    MakePerFeedColor("Item Level Colour",
+        function() return LLF.db.ilvlColor end,
+        function(c) LLF.db.ilvlColor = c end,
+        function() return LLF.db.ilvlColorPerFeed == true end,
+        function(v) LLF.db.ilvlColorPerFeed = v end,
+        function() return LLF.db.ilvlColor end,
+        function(c) LLF.db.ilvlColor = c end,
+        function() return LLF.db.partyFeed and LLF.db.partyFeed.ilvlColor end,
+        function(c) LLF.db.partyFeed.ilvlColor = c end,
+        ApplyFont)
+
+    MakePerFeedColor("Tertiary Stats Colour  (Leech / Speed / Avoidance)",
+        function() return LLF.db.tertiaryColor end,
+        function(c) LLF.db.tertiaryColor = c end,
+        function() return LLF.db.tertiaryColorPerFeed == true end,
+        function(v) LLF.db.tertiaryColorPerFeed = v end,
+        function() return LLF.db.tertiaryColor end,
+        function(c) LLF.db.tertiaryColor = c end,
+        function() return LLF.db.partyFeed and LLF.db.partyFeed.tertiaryColor end,
+        function(c) LLF.db.partyFeed.tertiaryColor = c end,
+        ApplyFont)
+
+    MakePerFeedColor("Sockets Colour",
+        function() return LLF.db.socketColor end,
+        function(c) LLF.db.socketColor = c end,
+        function() return LLF.db.socketColorPerFeed == true end,
+        function(v) LLF.db.socketColorPerFeed = v end,
+        function() return LLF.db.socketColor end,
+        function(c) LLF.db.socketColor = c end,
+        function() return LLF.db.partyFeed and LLF.db.partyFeed.socketColor end,
+        function(c) LLF.db.partyFeed.socketColor = c end,
+        ApplyFont)
+
+    MakePerFeedColor("Badge Count Colour",
+        function() return LLF.db.appendColor end,
+        function(c) LLF.db.appendColor = c end,
+        function() return LLF.db.appendColorPerFeed == true end,
+        function(v) LLF.db.appendColorPerFeed = v end,
+        function() return LLF.db.appendColor end,
+        function(c) LLF.db.appendColor = c end,
+        function() return LLF.db.partyFeed and LLF.db.partyFeed.appendColor end,
+        function(c) LLF.db.partyFeed.appendColor = c end,
+        ApplyFont)
+
+    MakePerFeedColor("Owned Count Colour",
+        function() return LLF.db.ownedColor end,
+        function(c) LLF.db.ownedColor = c end,
+        function() return LLF.db.ownedColorPerFeed == true end,
+        function(v) LLF.db.ownedColorPerFeed = v end,
+        function() return LLF.db.ownedColor end,
+        function(c) LLF.db.ownedColor = c end,
+        function() return LLF.db.partyFeed and LLF.db.partyFeed.ownedColor end,
+        function(c) LLF.db.partyFeed.ownedColor = c end,
+        ApplyFont)
 
     p.Finalize()
 end
@@ -3559,7 +3971,7 @@ local function BuildBlizzardPanel()
     content:SetWidth(CW); sf:SetScrollChild(content)
 
     local yOff = 0
-    local pageFns = { PageGeneral, PageLayout, PagePartyFeed, PageDurations, PagePrice, PageFilters, PageAudio, PageBlacklist, PageWishlist, PageProfiles }
+    local pageFns = { PageGeneral, PageLayout, PagePartyFeed, PageDurations, PagePrice, PageFilters, PageFont, PageAudio, PageBlacklist, PageWishlist, PageProfiles }
     for _, fn in ipairs(pageFns) do
         local sub = CreateFrame("Frame", N("PS"), content)
         sub:SetPoint("TOPLEFT",  content, 0, yOff)
@@ -3682,6 +4094,7 @@ local function BuildFloatWindow()
         { id="filters",      label="Filters",        fn=PageFilters        },
         { id="durations",    label="Durations",      fn=PageDurations      },
         { id="price",        label="Price",          fn=PagePrice          },
+        { id="font",         label="Font",            fn=PageFont           },
         { id="audio",        label="Audio",           fn=PageAudio          },
         { id="blacklist",    label="Blacklist",       fn=PageBlacklist      },
         { id="wishlist",     label="Wishlist",        fn=PageWishlist       },

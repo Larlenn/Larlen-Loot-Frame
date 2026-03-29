@@ -56,7 +56,7 @@ local function ApplyRowBorderColor(f)
     end
 end
 
-local function ApplyRowBorder(f)
+local function ApplyRowBorder(f, isParty)
     EnsureBackdrop(f)
     local db    = LLF.db
     local style = db and db.rowBorderStyle or "None"
@@ -70,7 +70,13 @@ local function ApplyRowBorder(f)
         insets   = { left = 0, right = 0, top = 0, bottom = 0 },
     })
     f:SetBackdropBorderColor(0, 0, 0, 0)
-    local bgA = (db and db.rowBgAlpha ~= nil) and db.rowBgAlpha or 0.80
+    local bgA
+    if isParty then
+        local pdf = db and db.partyFeed
+        bgA = (pdf and pdf.rowBgAlpha ~= nil) and pdf.rowBgAlpha or 0.80
+    else
+        bgA = (db and db.rowBgAlpha ~= nil) and db.rowBgAlpha or 0.80
+    end
     if db and db.rowBgTexture and db.rowBgTexture ~= "" then
         f:SetBackdropColor(1, 1, 1, bgA)
     else
@@ -95,6 +101,13 @@ local function ApplyRowBorder(f)
     end
     border:SetBackdropColor(0, 0, 0, 0)
     ApplyRowBorderColor(border)
+    for _, key in ipairs({ "_instanceBtn", "_whisperBtn", "_offerBtn" }) do
+        local btn = f[key]
+        if btn then
+            btn:SetBackdropColor(0.05, 0.05, 0.07, bgA)
+            btn:SetBackdropBorderColor(0, 0, 0, 0)
+        end
+    end
 end
 
 local RARITY_COLOR = {
@@ -162,7 +175,21 @@ local BUILTIN_FONTS = {
     ["PT Sans Narrow"]    = "Fonts\\ARIALN.TTF",
 }
 
+local function RGBToHex(c)
+    return ("|cff%02x%02x%02x"):format(
+        math.max(0, math.min(255, math.floor((c[1] or 0) * 255))),
+        math.max(0, math.min(255, math.floor((c[2] or 0) * 255))),
+        math.max(0, math.min(255, math.floor((c[3] or 0) * 255)))
+    )
+end
+
+local function StripColorCodes(s)
+    if not s then return "" end
+    return (s:gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", ""))
+end
+
 local _fontCache, _fontCacheKey
+local _partyFontCache, _partyFontCacheKey
 local function GetFontPath()
     local chosen = LLF.db and LLF.db.feedFont
     local key = chosen or ""
@@ -177,6 +204,17 @@ local function GetFontPath()
             or BUILTIN_FONTS["Friz Quadrata TT"]
     end
     _fontCache, _fontCacheKey = path, key
+    return path
+end
+
+local function GetPartyFontPath()
+    local chosen = LLF.db and LLF.db.partyFeed and LLF.db.partyFeed.feedFont
+    if not chosen or chosen == "" then return GetFontPath() end
+    local key = chosen
+    if _partyFontCacheKey == key and _partyFontCache then return _partyFontCache end
+    local path = (LSM and LSM:Fetch("font", chosen)) or BUILTIN_FONTS[chosen]
+    if not path then path = GetFontPath() end
+    _partyFontCache, _partyFontCacheKey = path, key
     return path
 end
 
@@ -240,9 +278,25 @@ local function SendWhisperMessage(target, display, link)
 end
 
 local function MakeActionBtn(label)
-    local btn = CreateFrame("Button", nil, UIParent, "UIPanelButtonTemplate")
+    local btn = CreateFrame("Button", nil, UIParent, "BackdropTemplate")
     btn:SetSize(16, 13)
-    btn:SetText(label)
+    btn:SetBackdrop({
+        bgFile   = WHITE_TEX,
+        edgeFile = WHITE_TEX,
+        edgeSize = 1,
+        insets   = { left = 0, right = 0, top = 0, bottom = 0 },
+    })
+    btn:SetBackdropColor(0.05, 0.05, 0.07, 0.80)
+    btn:SetBackdropBorderColor(0, 0, 0, 0)
+    local hl = btn:CreateTexture(nil, "HIGHLIGHT")
+    hl:SetAllPoints()
+    hl:SetColorTexture(1, 1, 1, 0.15)
+    local fs = btn:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    fs:SetAllPoints()
+    fs:SetJustifyH("CENTER")
+    fs:SetJustifyV("MIDDLE")
+    fs:SetText(label)
+    btn:SetFontString(fs)
     btn:SetFrameStrata("HIGH")
     btn._lastSent = 0
     btn:SetScript("OnLeave", function() GameTooltip:Hide() end)
@@ -293,16 +347,16 @@ local function IsNewTransmog(entry)
     return false
 end
 
-local function AcquireRow(parent)
+local function AcquireRow(parent, isParty)
     local f = table.remove(pool)
     if f then
         f:SetParent(parent)
-        ApplyRowBorder(f)
+        ApplyRowBorder(f, isParty)
         return f
     end
 
     f = CreateFrame("Frame", nil, parent, "BackdropTemplate")
-    ApplyRowBorder(f)
+    ApplyRowBorder(f, isParty)
 
     local edge = f:CreateTexture(nil, "OVERLAY")
     edge:SetPoint("TOPLEFT",    f, 0, 0)
@@ -697,7 +751,8 @@ local function PopulateRow(f, entry)
     local db    = LLF.db
     local count = entry.count or 1
 
-    local rh     = db.feedRowHeight or ROW_H
+    local isParty = entry.playerName ~= nil
+    local rh     = (isParty and db.partyFeed and db.partyFeed.feedRowHeight) or db.feedRowHeight or ROW_H
     local iconSz = math.max(math.floor(rh - 4), 16)
     f._iconFrame:SetSize(iconSz, iconSz)
 
@@ -705,7 +760,19 @@ local function PopulateRow(f, entry)
     local subSz   = math.max(math.floor(rh * 0.25), 8)
     local priceSz = math.max(math.floor(rh * 0.25), 8)
 
-    local fp = GetFontPath()
+    local fp = (isParty and LLF.db.fontFamilyPerFeed) and GetPartyFontPath() or GetFontPath()
+    local fOff = 0
+    if db.fontSizePerFeed then
+        fOff = isParty and (db.partyFeed and db.partyFeed.fontSizeOffset or 0) or (db.fontSizeOffset or 0)
+    else
+        fOff = db.fontSizeOffset or 0
+    end
+    local fFlags
+    if db.fontOutlinePerFeed then
+        fFlags = isParty and (db.partyFeed and db.partyFeed.fontOutline or "") or (db.fontOutline or "")
+    else
+        fFlags = db.fontOutline or ""
+    end
     local countSz = math.max(math.floor(iconSz * 0.26), 7)
     f._count:SetFont(fp, countSz, "OUTLINE")
     local corner = db.countCorner or "BOTTOMRIGHT"
@@ -716,11 +783,11 @@ local function PopulateRow(f, entry)
     f._count:SetPoint(corner, f._iconFrame, corner, offX, offY)
     f._count:SetJustifyH(justH)
     local subTypeSz = math.max(math.floor(rh * 0.22), 7)
-    f._name:SetFont(fp,  nameSz,  "")
-    f._subType:SetFont(fp, subTypeSz, "")
-    f._sub:SetFont(fp,   subSz,   "")
-    f._priceTop:SetFont(fp, priceSz, "")
-    f._priceMid:SetFont(fp, priceSz, "")
+    f._name:SetFont(fp,  math.max(nameSz    + fOff, 6), fFlags)
+    f._subType:SetFont(fp, math.max(subTypeSz + fOff, 5), fFlags)
+    f._sub:SetFont(fp,   math.max(subSz     + fOff, 5), fFlags)
+    f._priceTop:SetFont(fp, math.max(priceSz  + fOff, 5), fFlags)
+    f._priceMid:SetFont(fp, math.max(priceSz  + fOff, 5), fFlags)
 
     f._name:ClearAllPoints()
     f._name:SetPoint("TOPLEFT",  f._iconFrame, "TOPRIGHT",  6, -2)
@@ -822,18 +889,25 @@ local function PopulateRow(f, entry)
         if hex then nameColor = hex end
     end
     local name = entry.name or "Unknown"
-    if db.maxNameLength and #name > db.maxNameLength then
-        name = name:sub(1, db.maxNameLength) .. "..."
+    local maxLen = db.maxNameLengthPerFeed
+        and (isParty and (db.partyFeed and db.partyFeed.maxNameLength) or db.maxNameLength)
+        or db.maxNameLength
+    if maxLen and #name > maxLen then
+        name = name:sub(1, maxLen) .. "..."
     end
     f._name:SetText(nameColor .. name .. "|r")
 
     local subParts = _subParts
     wipe(subParts)
     if entry.playerName then
-        local pColor = "|cff99ccff"
+        local pColor
         if db.partyFeed and db.partyFeed.showClassColors ~= false and entry.playerClass then
             local cc = RAID_CLASS_COLORS and RAID_CLASS_COLORS[entry.playerClass]
             if cc and cc.colorStr then pColor = "|c" .. cc.colorStr end
+        end
+        if not pColor then
+            local c = db.partyFeed and db.partyFeed.playerNameColor
+            pColor = c and RGBToHex(c) or "|cff99ccff"
         end
         subParts[#subParts+1] = pColor .. entry.playerName .. "|r"
     end
@@ -844,7 +918,9 @@ local function PopulateRow(f, entry)
             local color = entry.itemCategory and "|cff44ddff" or "|cffddaa55"
             stParts[#stParts+1] = color .. (SUBTYPE_SHORT[entry.subType] or entry.subType) .. "|r"
         end
-        if entry.isGear and db.showUpgradeTrack ~= false and entry.upgradeTrackTier then
+        local showTrack = isParty and (db.partyFeed and db.partyFeed.showUpgradeTrackParty == true)
+                       or (not isParty and db.showUpgradeTrack ~= false)
+        if entry.isGear and showTrack and entry.upgradeTrackTier then
             local txt = UPGRADE_TRACK_TEXT[entry.upgradeTrackTier]
             if txt then stParts[#stParts+1] = txt end
         end
@@ -859,19 +935,35 @@ local function PopulateRow(f, entry)
         end
         f._subType:SetText(table.concat(stParts, "  "))
     end
+    local function GetElemColor(key, perFeedKey)
+        local c = db[perFeedKey] and (isParty and (db.partyFeed and db.partyFeed[key]) or db[key]) or db[key]
+        return c
+    end
     if entry.isGear then
-        if db.showIlvl    and entry.ilvl     and entry.ilvl > 0     then subParts[#subParts+1] = "ilvl " .. entry.ilvl end
-        if db.showTertiary and entry.tertiary and #entry.tertiary > 0 then subParts[#subParts+1] = entry.tertiary end
-        if db.showSockets  and entry.sockets  and #entry.sockets  > 0 then subParts[#subParts+1] = entry.sockets  end
+        if db.showIlvl and entry.ilvl and entry.ilvl > 0 then
+            local c = GetElemColor("ilvlColor", "ilvlColorPerFeed")
+            subParts[#subParts+1] = c and (RGBToHex(c) .. "ilvl " .. entry.ilvl .. "|r") or ("ilvl " .. entry.ilvl)
+        end
+        if db.showTertiary and entry.tertiary and #entry.tertiary > 0 then
+            local c = GetElemColor("tertiaryColor", "tertiaryColorPerFeed")
+            subParts[#subParts+1] = c and (RGBToHex(c) .. StripColorCodes(entry.tertiary) .. "|r") or entry.tertiary
+        end
+        if db.showSockets and entry.sockets and #entry.sockets > 0 then
+            local c = GetElemColor("socketColor", "socketColorPerFeed")
+            subParts[#subParts+1] = c and (RGBToHex(c) .. StripColorCodes(entry.sockets) .. "|r") or entry.sockets
+        end
     elseif entry.append and #entry.append > 0 then
         if entry.rarity ~= 6 or db.showInvCount then
-            subParts[#subParts+1] = entry.append
+            local c = GetElemColor("appendColor", "appendColorPerFeed")
+            subParts[#subParts+1] = c and (RGBToHex(c) .. entry.append .. "|r") or entry.append
         end
     end
     if db.showInvCount and not entry.playerName and entry.invCount and entry.invCount > 0 then
-        subParts[#subParts+1] = "|cffaaaaaa" .. entry.invCount .. " owned|r"
+        local c = GetElemColor("ownedColor", "ownedColorPerFeed")
+        subParts[#subParts+1] = c and (RGBToHex(c) .. entry.invCount .. " owned|r") or ("|cffaaaaaa" .. entry.invCount .. " owned|r")
     end
     f._sub:SetText(table.concat(subParts, "  "))
+    f._sub:SetTextColor(SUBTEXT_COLOR[1], SUBTEXT_COLOR[2], SUBTEXT_COLOR[3], SUBTEXT_COLOR[4])
     RefreshPriceDisplay(f, entry)
 
     local target  = entry.playerNameFull or entry.playerName
@@ -915,6 +1007,16 @@ local function PopulateRow(f, entry)
             oBtn._offerLink = nil
             oBtn:Hide()
         end
+    end
+
+    do
+        local pdf = db.partyFeed
+        local btnA = isParty
+            and ((pdf and pdf.rowBgAlpha ~= nil) and pdf.rowBgAlpha or 0.80)
+            or  ((db.rowBgAlpha ~= nil) and db.rowBgAlpha or 0.80)
+        if f._instanceBtn then f._instanceBtn:SetBackdropColor(0.05, 0.05, 0.07, btnA) end
+        if f._whisperBtn  then f._whisperBtn:SetBackdropColor(0.05, 0.05, 0.07, btnA)  end
+        if f._offerBtn    then f._offerBtn:SetBackdropColor(0.05, 0.05, 0.07, btnA)    end
     end
 
     ApplyRowGlow(f, entry)
@@ -1037,6 +1139,7 @@ end
 function Feed:ApplyLayout()
     if not feedFrame then return end
     local db = LLF.db
+    feedFrame:SetScale(math.max(0.05, db.feedScale or 1.0))
     feedFrame:SetAlpha(db.feedAlpha or 1.0)
     if db.feedBackground ~= false then
         feedFrame:SetBackdropColor(0.04, 0.04, 0.06, db.feedBgAlpha or 0.85)
@@ -1451,6 +1554,7 @@ end
 function PFeed:ApplyLayout()
     if not partyFeedFrame then return end
     local pdf = LLF.db.partyFeed
+    partyFeedFrame:SetScale(math.max(0.05, pdf.feedScale or 1.0))
     partyFeedFrame:SetAlpha(pdf.feedAlpha or 1.0)
     if pdf.feedBackground ~= false then
         partyFeedFrame:SetBackdropColor(0.04, 0.04, 0.06, pdf.feedBgAlpha or 0.85)
@@ -1464,7 +1568,7 @@ end
 
 function PFeed:ApplyRowStyles()
     for _, r in ipairs(partyRows) do
-        ApplyRowBorder(r.rowFrame)
+        ApplyRowBorder(r.rowFrame, true)
     end
 end
 
@@ -1486,7 +1590,6 @@ function PFeed:AddEntry(entry)
     local rar = entry.rarity or 1
     local gf = db.groupFilters
     if gf and gf.filterRarity and gf.filterRarity[rar] == false then return end
-    if rar < (pdf.filterMinRarity or 0) then return end
 
     if not entry.isPreview and db.wishlistEnabled and db.wishlistGroupLoot and entry.link then
         if not LLF.Config:IsItemWishlisted(entry.link) then return end
@@ -1524,7 +1627,7 @@ function PFeed:AddEntry(entry)
     end
 
     local wasEmpty = #partyRows == 0
-    local f = AcquireRow(partyFeedFrame)
+    local f = AcquireRow(partyFeedFrame, true)
     local pw = pdf.feedWidth or 280
     local prh = pdf.feedRowHeight or ROW_H
     f:SetWidth(pw - PAD_SIDE * 2)
