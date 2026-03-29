@@ -830,7 +830,12 @@ local function PopulateRow(f, entry)
     local subParts = _subParts
     wipe(subParts)
     if entry.playerName then
-        subParts[#subParts+1] = "|cff99ccff" .. entry.playerName .. "|r"
+        local pColor = "|cff99ccff"
+        if db.partyFeed and db.partyFeed.showClassColors ~= false and entry.playerClass then
+            local cc = RAID_CLASS_COLORS and RAID_CLASS_COLORS[entry.playerClass]
+            if cc and cc.colorStr then pColor = "|c" .. cc.colorStr end
+        end
+        subParts[#subParts+1] = pColor .. entry.playerName .. "|r"
     end
     do
         local stParts = _stParts
@@ -1697,19 +1702,19 @@ function PFeed:Preview()
     self:ClearAll()
     local samples = {
         { icon=135274,  name="Thunderfury, Blessed Blade",   rarity=5, source=4, ilvl=650, isGear=true,  price=987654,  ahPrice=12500000, canAH=true,
-          playerName="Grimveil", playerNameFull="Grimveil", subType="One-Handed Sword", mergeKey="ppvWHISPER_TEST", isPreview=true,
+          playerName="Grimveil",  playerNameFull="Grimveil",  playerClass="WARRIOR",     subType="One-Handed Sword", mergeKey="ppvWHISPER_TEST", isPreview=true,
           link="|cffff8000|Hitem:19019::::::::60:::::|h[Thunderfury, Blessed Blade]|h|r" },
-        { icon=136243,  name="Dreadful Gladiator's Blade",  rarity=4, source=3, ilvl=398, isGear=true,  price=50000,  subType="Two-Handed Sword", playerName="Stormwrath", mergeKey="ppv1", isPreview=true, upgradeTrackTier=3,
+        { icon=136243,  name="Dreadful Gladiator's Blade",  rarity=4, source=3, ilvl=398, isGear=true,  price=50000,  subType="Two-Handed Sword", playerName="Stormwrath", playerClass="MAGE",        mergeKey="ppv1", isPreview=true, upgradeTrackTier=3,
           link="item:19364" },
-        { icon=133784,  name="Money",                        rarity=1, source=1,           isGear=false, price=123456,                             playerName="Thalor",    mergeKey="ppv2", isPreview=true },
-        { icon=463446,  name="Timewarped Badge",             rarity=6, source=2, count=15, isGear=false, price=0,      append=" (500)",            playerName="Frostfell", mergeKey="ppv3", isPreview=true },
-        { icon=133765,  name="Thornwood Wristguards",        rarity=3, source=3, ilvl=285, isGear=true,  price=1234,   subType="Leather",          playerName="Vaelos",    mergeKey="ppv4", isPreview=true, isTransmog=true, upgradeTrackTier=2, craftingQuality=3,
+        { icon=133784,  name="Money",                        rarity=1, source=1,           isGear=false, price=123456,                             playerName="Thalor",     playerClass="DRUID",       mergeKey="ppv2", isPreview=true },
+        { icon=463446,  name="Timewarped Badge",             rarity=6, source=2, count=15, isGear=false, price=0,      append=" (500)",            playerName="Frostfell",  playerClass="DEATHKNIGHT", mergeKey="ppv3", isPreview=true },
+        { icon=133765,  name="Thornwood Wristguards",        rarity=3, source=3, ilvl=285, isGear=true,  price=1234,   subType="Leather",          playerName="Vaelos",     playerClass="PALADIN",     mergeKey="ppv4", isPreview=true, isTransmog=true, upgradeTrackTier=2, craftingQuality=3,
           link="item:57232" },
-        { icon=4638563, name="Void-Touched Wristguard",      rarity=4, source=3, ilvl=639, isGear=true,  price=0,      subType="Plate",            playerName="Nightfall", mergeKey="ppv5", isPreview=true, isUpgrade=true, upgradeTrackTier=5,
+        { icon=4638563, name="Void-Touched Wristguard",      rarity=4, source=3, ilvl=639, isGear=true,  price=0,      subType="Plate",            playerName="Nightfall",  playerClass="HUNTER",      mergeKey="ppv5", isPreview=true, isUpgrade=true, upgradeTrackTier=5,
           link="item:133632" },
-        { icon=132261,  name="Reins of the Raven Lord",       rarity=4, source=3, count=1,  isGear=false, price=0,      subType="Mount",            playerName="Aetheron",  mergeKey="ppv6", isPreview=true, itemCategory="mount",
+        { icon=132261,  name="Reins of the Raven Lord",       rarity=4, source=3, count=1,  isGear=false, price=0,      subType="Mount",            playerName="Aetheron",   playerClass="EVOKER",      mergeKey="ppv6", isPreview=true, itemCategory="mount",
           link="item:32768" },
-        { icon=656558,  name="Disgusting Oozeling",          rarity=3, source=4, count=1,  isGear=false, price=0,      subType="Pet",              playerName="Cinderfall", mergeKey="ppv7", isPreview=true, itemCategory="pet",
+        { icon=656558,  name="Disgusting Oozeling",          rarity=3, source=4, count=1,  isGear=false, price=0,      subType="Pet",              playerName="Cinderfall",  playerClass="WARLOCK",     mergeKey="ppv7", isPreview=true, itemCategory="pet",
           link="item:20769" },
     }
     local ids = {}

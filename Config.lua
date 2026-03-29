@@ -141,7 +141,8 @@ Config.DEFAULTS = {
         showRaid       = true,
         filterMinRarity = 0,
         filterPets   = true,
-        filterMounts = true,
+        filterMounts    = true,
+        showClassColors = true,
     },
 }
 

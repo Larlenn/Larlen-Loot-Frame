@@ -1,5 +1,5 @@
 local LLF = {}
-LLF.VERSION = "1.1.2"
+LLF.VERSION = "1.1.3"
 LarlenLootFrame = LLF
 
 function LLF.IsAddonLoaded(name)

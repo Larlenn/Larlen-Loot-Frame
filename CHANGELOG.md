@@ -1,5 +1,8 @@
 # Larlen Loot Frame Changelog
 
+## v1.1.3
+- Added class colour coding for player names in the group loot feed, with a toggle to disable it
+
 ## v1.1.2
 - Updated upgrade arrow to use the native WoW bag UI atlas for a cleaner look
 - Updated transmog indicator to use the native WoW transmog atlas icon

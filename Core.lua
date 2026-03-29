@@ -371,6 +371,22 @@ local function SafeString(value)
     return clean
 end
 
+local function GetGroupMemberClass(name)
+    local short = name:match("^([^%-]+)") or name
+    local inRaid = IsInRaid()
+    local count  = GetNumGroupMembers()
+    local prefix = inRaid and "raid" or "party"
+    for i = 1, count do
+        local unit = prefix .. i
+        local uName = UnitName(unit)
+        if uName == short or uName == name then
+            local _, token = UnitClass(unit)
+            return token
+        end
+    end
+    return nil
+end
+
 local function HandleChatMsgLoot(msg, _, _, _, sender)
     msg = SafeString(msg)
     if msg == "" then return end
@@ -403,6 +419,7 @@ local function HandleChatMsgLoot(msg, _, _, _, sender)
                         if entry and not ShouldFilterCategory(entry.itemCategory, true) then
                             entry.playerName     = receiver
                             entry.playerNameFull = sender
+                            entry.playerClass    = GetGroupMemberClass(receiver)
                             entry.mergeKey       = "party_chat:" .. receiver .. ":" .. entry.mergeKey
                             LLF.PartyFeed:AddEntry(entry)
                         end

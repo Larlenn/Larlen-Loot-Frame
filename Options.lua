@@ -1932,6 +1932,13 @@ local function PagePartyFeed(parent, CW)
             if LLF.PartyFeed then LLF.PartyFeed:ApplyFont() end
             LLF.PartyFeed:RefreshTestRows()
         end)
+    p.Row("Color player names by class",
+        function() return LLF.db.partyFeed.showClassColors ~= false end,
+        function(v)
+            LLF.db.partyFeed.showClassColors = v
+            if LLF.PartyFeed then LLF.PartyFeed:ApplyFont() end
+            LLF.PartyFeed:RefreshTestRows()
+        end)
 
     p.Header("Need?")
     local whisperToggle = p.Row("Show message buttons for items others may need",
