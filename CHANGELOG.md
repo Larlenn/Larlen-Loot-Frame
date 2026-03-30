@@ -1,5 +1,8 @@
 # Larlen Loot Frame Changelog
 
+## v1.2.1
+- Fixed G and W buttons showing incorrectly at certain feed scale values
+
 ## v1.2.0
 - Added new Font section with font size offset slider - can be configured separately for personal and group feeds
 - Added font outline picker for personal and group feeds

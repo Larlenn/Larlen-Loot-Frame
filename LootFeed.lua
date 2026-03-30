@@ -292,7 +292,7 @@ local function MakeActionBtn(label)
     hl:SetAllPoints()
     hl:SetColorTexture(1, 1, 1, 0.15)
     local fs = btn:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-    fs:SetAllPoints()
+    fs:SetPoint("CENTER")
     fs:SetJustifyH("CENTER")
     fs:SetJustifyV("MIDDLE")
     fs:SetText(label)
@@ -971,6 +971,7 @@ local function PopulateRow(f, entry)
     if db.showWhisperButtons ~= false and target and entry.link then
         local btnSz = math.max(math.floor(rh * 0.24), 7)
         local gBtn, wBtn = f._instanceBtn, f._whisperBtn
+        gBtn:SetParent(f); wBtn:SetParent(f)
         gBtn._whisperTarget = target; gBtn._whisperLink = entry.link; gBtn._whisperDisplay = display
         gBtn:SetSize(16, 13); do local bfs = gBtn:GetFontString(); if bfs then bfs:SetFont(fp, btnSz, "OUTLINE") end end
         wBtn._whisperTarget = target; wBtn._whisperLink = entry.link; wBtn._whisperDisplay = display
@@ -996,6 +997,7 @@ local function PopulateRow(f, entry)
             and tradeable
             and not entry.playerName
         if shouldOffer then
+            oBtn:SetParent(f)
             oBtn._offerLink = entry.link
             oBtn:SetSize(16, 13)
             local ofs2 = oBtn:GetFontString()
