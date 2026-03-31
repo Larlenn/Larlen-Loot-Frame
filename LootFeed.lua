@@ -693,7 +693,7 @@ local function ApplyRowGlow(f, entry)
         end
     end
 
-    if db.wishlistGlowEnabled and entry.link and LLF.Config:IsItemWishlisted(entry.link) then
+    if db.wishlistEnabled and db.wishlistGlowEnabled and entry.link and LLF.Config:IsItemWishlisted(entry.link) then
         local wc = db.wishlistGlowColor or _wlColor
         _wlColor[1] = wc[1]; _wlColor[2] = wc[2]; _wlColor[3] = wc[3]; _wlColor[4] = wc[4] or 1
         local color = _wlColor
@@ -721,6 +721,11 @@ local function ApplyRowGlow(f, entry)
 end
 
 local function RefreshPriceDisplay(f, entry)
+    if entry.source == 1 then
+        f._priceTop:SetText("")
+        f._priceMid:SetText("")
+        return
+    end
     local db    = LLF.db
     local count = entry.count or 1
     local prefixMode = db.pricePrefixMode or 4
@@ -888,12 +893,18 @@ local function PopulateRow(f, entry)
         end
         if hex then nameColor = hex end
     end
-    local name = entry.name or "Unknown"
-    local maxLen = db.maxNameLengthPerFeed
-        and (isParty and (db.partyFeed and db.partyFeed.maxNameLength) or db.maxNameLength)
-        or db.maxNameLength
-    if maxLen and #name > maxLen then
-        name = name:sub(1, maxLen) .. "..."
+    local name
+    if entry.source == 1 then
+        name = LLF.Price:FormatAuto(entry.price or 0)
+        nameColor = "|cffffff00"
+    else
+        name = entry.name or "Unknown"
+        local maxLen = db.maxNameLengthPerFeed
+            and (isParty and (db.partyFeed and db.partyFeed.maxNameLength) or db.maxNameLength)
+            or db.maxNameLength
+        if maxLen and #name > maxLen then
+            name = name:sub(1, maxLen) .. "..."
+        end
     end
     f._name:SetText(nameColor .. name .. "|r")
 
@@ -915,7 +926,15 @@ local function PopulateRow(f, entry)
         local stParts = _stParts
         wipe(stParts)
         if db.showSubType and entry.subType and #entry.subType > 0 and (entry.isGear or entry.itemCategory) then
-            local color = entry.itemCategory and "|cff44ddff" or "|cffddaa55"
+            local color
+            if entry.itemCategory == "keystone" then
+                local c = db.keystoneColor
+                color = c and RGBToHex(c) or "|cff44ddff"
+            elseif entry.itemCategory then
+                color = "|cff44ddff"
+            else
+                color = "|cffddaa55"
+            end
             stParts[#stParts+1] = color .. (SUBTYPE_SHORT[entry.subType] or entry.subType) .. "|r"
         end
         local showTrack = isParty and (db.partyFeed and db.partyFeed.showUpgradeTrackParty == true)
@@ -1176,9 +1195,9 @@ function Feed:AddEntry(entry)
 
     local rar = entry.rarity or 1
     local pf = db.personalFilters
-    if pf and pf.filterRarity and pf.filterRarity[rar] == false then return end
+    if entry.source ~= 1 and entry.itemCategory ~= "keystone" and pf and pf.filterRarity and pf.filterRarity[rar] == false then return end
 
-    if not entry.isPreview and db.wishlistEnabled and entry.link then
+    if not entry.isPreview and entry.itemCategory ~= "keystone" and db.wishlistEnabled and db.wishlistHideOthers ~= false and entry.link then
         if not LLF.Config:IsItemWishlisted(entry.link) then return end
     end
 
@@ -1276,7 +1295,7 @@ function Feed:AddEntry(entry)
         end
     end
 
-    if db.wishlistSoundEnabled and entry.link and LLF.Config:IsItemWishlisted(entry.link) then
+    if db.wishlistEnabled and db.wishlistSoundEnabled and entry.link and LLF.Config:IsItemWishlisted(entry.link) then
         LLF:PlaySound(db.wishlistSoundChoice or 1)
     end
 end
@@ -1301,7 +1320,7 @@ function Feed:OnUpdate(elapsed)
         if r.entry.isPreview and Feed.testLocked then
             local rar = r.entry.rarity or 1
             local pf = db.personalFilters
-            local filtered = (pf and pf.filterRarity and pf.filterRarity[rar] == false)
+            local filtered = (r.entry.source ~= 1 and pf and pf.filterRarity and pf.filterRarity[rar] == false)
             if not filtered and r.entry.itemCategory then
                 if r.entry.itemCategory == "pet"     and pf and pf.filterPets    == false then filtered = true end
                 if r.entry.itemCategory == "mount"   and pf and pf.filterMounts  == false then filtered = true end
@@ -1310,7 +1329,7 @@ function Feed:OnUpdate(elapsed)
             if not filtered and db.blacklistEnabled and r.entry.link then
                 if LLF.Config:IsItemBlacklisted(r.entry.link) then filtered = true end
             end
-            if not filtered and db.wishlistEnabled and r.entry.link then
+            if not filtered and db.wishlistEnabled and db.wishlistHideOthers ~= false and r.entry.link then
                 if not LLF.Config:IsItemWishlisted(r.entry.link) then filtered = true end
             end
             if filtered then
@@ -1381,12 +1400,51 @@ function Feed:RefreshRows()
     self:ApplyLayout()
 end
 
-function Feed:RefreshTestRows()
+function Feed:ApplyTestFilters()
+    local db = LLF.db
+    local dirty = false
+    for _, r in ipairs(rows) do
+        if r.entry.isPreview then
+            local rar = r.entry.rarity or 1
+            local pf = db.personalFilters
+            local filtered = (r.entry.source ~= 1 and pf and pf.filterRarity and pf.filterRarity[rar] == false)
+            if not filtered and r.entry.itemCategory then
+                if r.entry.itemCategory == "pet"     and pf and pf.filterPets    == false then filtered = true end
+                if r.entry.itemCategory == "mount"   and pf and pf.filterMounts  == false then filtered = true end
+                if r.entry.itemCategory == "housing" and pf and pf.filterHousing == false then filtered = true end
+            end
+            if not filtered and db.blacklistEnabled and r.entry.link then
+                if LLF.Config:IsItemBlacklisted(r.entry.link) then filtered = true end
+            end
+            if not filtered and db.wishlistEnabled and db.wishlistHideOthers ~= false and r.entry.link then
+                if not LLF.Config:IsItemWishlisted(r.entry.link) then filtered = true end
+            end
+            local shown = r.rowFrame:IsShown()
+            if filtered and shown then
+                r.rowFrame:Hide(); dirty = true
+            elseif not filtered and not shown then
+                r.rowFrame:Show(); r.rowFrame:SetAlpha(1); dirty = true
+            end
+            r.expiresAt = GetTime() + 60
+            r.fadeStart = nil
+        end
+    end
+    if dirty then PositionAllRows() end
+end
+
+function Feed:RefreshTestRows(playSound)
     if not Feed.testLocked then return end
     PositionAllRows()
+    local db = LLF.db
+    local playedWlSound = false
     for _, r in ipairs(rows) do
         if r.entry.isPreview and r.rowFrame:IsShown() then
             PopulateRow(r.rowFrame, r.entry)
+            if playSound and not playedWlSound and db.wishlistEnabled and db.wishlistSoundEnabled
+               and r.entry.link and LLF.Config:IsItemWishlisted(r.entry.link) then
+                LLF:PlaySound(db.wishlistSoundChoice or 1)
+                playedWlSound = true
+            end
         end
     end
 end
@@ -1438,6 +1496,7 @@ function Feed:Preview()
     local pending = #ids
     if pending == 0 then
         for _, item in ipairs(samples) do self:AddEntry(item) end
+        self:ApplyTestFilters()
     else
         local fired = false
         local function TryShow()
@@ -1445,6 +1504,7 @@ function Feed:Preview()
             if pending <= 0 and not fired then
                 fired = true
                 for _, item in ipairs(samples) do self:AddEntry(item) end
+                Feed:ApplyTestFilters()
             end
         end
         for _, id in ipairs(ids) do
@@ -1593,7 +1653,7 @@ function PFeed:AddEntry(entry)
     local gf = db.groupFilters
     if gf and gf.filterRarity and gf.filterRarity[rar] == false then return end
 
-    if not entry.isPreview and db.wishlistEnabled and db.wishlistGroupLoot and entry.link then
+    if not entry.isPreview and db.wishlistEnabled and db.wishlistHideOthers ~= false and db.wishlistGroupLoot and entry.link then
         if not LLF.Config:IsItemWishlisted(entry.link) then return end
     end
 
@@ -1704,7 +1764,7 @@ function PFeed:OnUpdate(elapsed)
             if not filtered and db.blacklistEnabled and r.entry.link then
                 if LLF.Config:IsItemBlacklisted(r.entry.link) then filtered = true end
             end
-            if not filtered and db.wishlistEnabled and db.wishlistGroupLoot and r.entry.link then
+            if not filtered and db.wishlistEnabled and db.wishlistHideOthers ~= false and db.wishlistGroupLoot and r.entry.link then
                 if not LLF.Config:IsItemWishlisted(r.entry.link) then filtered = true end
             end
             if filtered then
@@ -1773,12 +1833,51 @@ function PFeed:RefreshRows()
     self:ApplyLayout()
 end
 
-function PFeed:RefreshTestRows()
+function PFeed:ApplyTestFilters()
+    local db = LLF.db
+    local dirty = false
+    for _, r in ipairs(partyRows) do
+        if r.entry.isPreview then
+            local rar = r.entry.rarity or 1
+            local gf = db.groupFilters
+            local filtered = (gf and gf.filterRarity and gf.filterRarity[rar] == false)
+            if not filtered and r.entry.itemCategory then
+                local pff = db.partyFeed
+                if r.entry.itemCategory == "pet"   and pff and pff.filterPets   == false then filtered = true end
+                if r.entry.itemCategory == "mount" and pff and pff.filterMounts == false then filtered = true end
+            end
+            if not filtered and db.blacklistEnabled and r.entry.link then
+                if LLF.Config:IsItemBlacklisted(r.entry.link) then filtered = true end
+            end
+            if not filtered and db.wishlistEnabled and db.wishlistHideOthers ~= false and db.wishlistGroupLoot and r.entry.link then
+                if not LLF.Config:IsItemWishlisted(r.entry.link) then filtered = true end
+            end
+            local shown = r.rowFrame:IsShown()
+            if filtered and shown then
+                r.rowFrame:Hide(); dirty = true
+            elseif not filtered and not shown then
+                r.rowFrame:Show(); r.rowFrame:SetAlpha(1); dirty = true
+            end
+            r.expiresAt = GetTime() + 60
+            r.fadeStart = nil
+        end
+    end
+    if dirty then PositionAllPartyRows() end
+end
+
+function PFeed:RefreshTestRows(playSound)
     if not PFeed.testLocked then return end
     PositionAllPartyRows()
+    local db = LLF.db
+    local playedWlSound = false
     for _, r in ipairs(partyRows) do
         if r.entry.isPreview and r.rowFrame:IsShown() then
             PopulateRow(r.rowFrame, r.entry)
+            if playSound and not playedWlSound and db.wishlistEnabled and db.wishlistSoundEnabled
+               and r.entry.link and LLF.Config:IsItemWishlisted(r.entry.link) then
+                LLF:PlaySound(db.wishlistSoundChoice or 1)
+                playedWlSound = true
+            end
         end
     end
 end
@@ -1832,6 +1931,7 @@ function PFeed:Preview()
     local pending = #ids
     if pending == 0 then
         for _, item in ipairs(samples) do self:AddEntry(item) end
+        self:ApplyTestFilters()
     else
         local fired = false
         local function TryShow()
@@ -1839,6 +1939,7 @@ function PFeed:Preview()
             if pending <= 0 and not fired then
                 fired = true
                 for _, item in ipairs(samples) do self:AddEntry(item) end
+                PFeed:ApplyTestFilters()
             end
         end
         for _, id in ipairs(ids) do

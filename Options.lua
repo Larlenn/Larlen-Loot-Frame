@@ -1679,12 +1679,30 @@ local function PageFilters(parent, CW)
     p.RowL("|cffcc2222Honor|r",
         function() return LLF.db.personalFilters.filterRarity[8] ~= false end,
         function(v) LLF.db.personalFilters.filterRarity[8] = v end)
+    local SyncGoldSlider
     p.RowR("|cffffff00Gold|r",
         function() return LLF.db.showGold ~= false end,
-        function(v) LLF.db.showGold = v end)
+        function(v)
+            LLF.db.showGold = v
+            if SyncGoldSlider then SyncGoldSlider() end
+        end)
 
-    p.Header("|cff55ff55Personal Loot|r - Reputation")
-    p.RowL("Show personal reputation",
+    local yAfterGoldRow = p.GetY()
+
+    local goldMinSlider = p.SlideInput("Min gold to show  (0 = all)", 0, 100000, 100,
+        function() return LLF.db.goldMinAmount or 0 end,
+        function(v) LLF.db.goldMinAmount = v end, "g")
+
+    local yAfterSlider = p.GetY()
+
+    local restFrame = CreateFrame("Frame", nil, parent)
+    restFrame:SetPoint("TOPLEFT",  parent, 0, yAfterSlider)
+    restFrame:SetPoint("TOPRIGHT", parent, 0, yAfterSlider)
+
+    local p2 = MakePage(restFrame, CW)
+
+    p2.Header("|cff55ff55Personal Loot|r - Reputation")
+    p2.RowL("Show personal reputation",
         function() return LLF.db.personalFilters.filterRep ~= false end,
         function(v)
             LLF.db.personalFilters.filterRep = v
@@ -1694,23 +1712,23 @@ local function PageFilters(parent, CW)
                 else ef:UnregisterEvent("CHAT_MSG_COMBAT_FACTION_CHANGE") end
             end
         end)
-    p.RowR("Show guild reputation",
+    p2.RowR("Show guild reputation",
         function() return LLF.db.personalFilters.filterGuildRep ~= false end,
         function(v) LLF.db.personalFilters.filterGuildRep = v end)
 
-    p.Header("|cff55ff55Personal Loot|r - Item Types")
-    p.RowL("|cff44ddffPets|r",
+    p2.Header("|cff55ff55Personal Loot|r - Item Types")
+    p2.RowL("|cff44ddffPets|r",
         function() return LLF.db.personalFilters.filterPets ~= false end,
         function(v) LLF.db.personalFilters.filterPets = v end)
-    p.RowR("|cff44ddffMounts|r",
+    p2.RowR("|cff44ddffMounts|r",
         function() return LLF.db.personalFilters.filterMounts ~= false end,
         function(v) LLF.db.personalFilters.filterMounts = v end)
-    p.RowL("|cffcc8844Housing Decor|r",
+    p2.RowL("|cffcc8844Housing Decor|r",
         function() return LLF.db.personalFilters.filterHousing ~= false end,
         function(v) LLF.db.personalFilters.filterHousing = v end)
-    p.SetY(p.GetY() - ROW_H - SEP)
+    p2.SetY(p2.GetY() - ROW_H - SEP)
 
-    p.Sep(20)
+    p2.Sep(20)
 
     local RFILT_GROUP = {
         { 0, "|cff9d9d9dPoor|r" },               { 1, "|cffffffffCommon|r"           },
@@ -1719,30 +1737,41 @@ local function PageFilters(parent, CW)
         { 7, "|cff00ccffQuest / Heirloom|r" },
     }
 
-    p.Header("|cff55bbffGroup Loot|r - Rarity")
+    p2.Header("|cff55bbffGroup Loot|r - Rarity")
     for i = 1, #RFILT_GROUP, 2 do
         local L, R = RFILT_GROUP[i], RFILT_GROUP[i + 1]
-        p.RowL(L[2],
+        p2.RowL(L[2],
             function() return LLF.db.groupFilters.filterRarity[L[1]] ~= false end,
             function(v) LLF.db.groupFilters.filterRarity[L[1]] = v end)
         if R then
-            p.RowR(R[2],
+            p2.RowR(R[2],
                 function() return LLF.db.groupFilters.filterRarity[R[1]] ~= false end,
                 function(v) LLF.db.groupFilters.filterRarity[R[1]] = v end)
         else
-            p.SetY(p.GetY() - ROW_H - SEP)
+            p2.SetY(p2.GetY() - ROW_H - SEP)
         end
     end
 
-    p.Header("|cff55bbffGroup Loot|r - Item Types")
-    p.RowL("|cff44ddffPets|r",
+    p2.Header("|cff55bbffGroup Loot|r - Item Types")
+    p2.RowL("|cff44ddffPets|r",
         function() return LLF.db.partyFeed.filterPets ~= false end,
         function(v) LLF.db.partyFeed.filterPets = v end)
-    p.RowR("|cff44ddffMounts|r",
+    p2.RowR("|cff44ddffMounts|r",
         function() return LLF.db.partyFeed.filterMounts ~= false end,
         function(v) LLF.db.partyFeed.filterMounts = v end)
 
-    p.Finalize()
+    p2.Finalize()
+
+    SyncGoldSlider = function()
+        local goldOn = LLF.db.showGold ~= false
+        goldMinSlider:SetShown(goldOn)
+        local restY = goldOn and yAfterSlider or yAfterGoldRow
+        restFrame:ClearAllPoints()
+        restFrame:SetPoint("TOPLEFT",  parent, 0, restY)
+        restFrame:SetPoint("TOPRIGHT", parent, 0, restY)
+        parent:SetHeight(math.abs(restY) + restFrame:GetHeight() + 16)
+    end
+    SyncGoldSlider()
 end
 
 local function PagePartyFeed(parent, CW)
@@ -2464,6 +2493,50 @@ local function PageFont(parent, CW)
         function(c) LLF.db.partyFeed.ownedColor = c end,
         ApplyFont)
 
+    do
+        local DEF_KEYSTONE = { 0.267, 0.867, 1.0, 1.0 }
+        p.Header("Keystone Name Colour")
+        local y0 = p.GetY()
+        local lbl = parent:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+        lbl:SetPoint("TOPLEFT", parent, p.PAD, y0 - 2)
+        lbl:SetText("Colour")
+        lbl:SetTextColor(WHITE[1], WHITE[2], WHITE[3], 0.80)
+        local sw = CreateFrame("Button", N("SW"), parent, "BackdropTemplate")
+        sw:SetSize(22, 22)
+        sw:SetBackdrop(FLAT_BD)
+        sw:SetBackdropBorderColor(0.5, 0.5, 0.5, 0.8)
+        local function SyncSW()
+            local c = LLF.db.keystoneColor or DEF_KEYSTONE
+            sw:SetBackdropColor(c[1], c[2], c[3], 1)
+        end
+        SyncSW()
+        allToggles[#allToggles + 1] = { Sync = SyncSW }
+        sw:SetPoint("LEFT", lbl, "RIGHT", 10, 2)
+        sw:SetScript("OnClick", function()
+            local c = LLF.db.keystoneColor or DEF_KEYSTONE
+            if ColorPPDefault then
+                ColorPPDefault.colors = { r = DEF_KEYSTONE[1], g = DEF_KEYSTONE[2], b = DEF_KEYSTONE[3], a = 1 }
+            end
+            local info = {
+                r = c[1], g = c[2], b = c[3],
+                swatchFunc = function()
+                    local r, g, b = ColorPickerFrame:GetColorRGB()
+                    LLF.db.keystoneColor = { r, g, b, 1 }; SyncSW(); ApplyFont()
+                end,
+                cancelFunc = function(prev)
+                    LLF.db.keystoneColor = { prev.r, prev.g, prev.b, 1 }; SyncSW(); ApplyFont()
+                end,
+                defaultFunc = function()
+                    LLF.db.keystoneColor = nil; SyncSW(); ApplyFont()
+                end,
+            }
+            ColorPickerFrame:SetupColorPickerAndShow(info)
+        end)
+        sw:SetScript("OnEnter", function(s) s:SetBackdropBorderColor(1, 1, 1, 1) end)
+        sw:SetScript("OnLeave", function(s) s:SetBackdropBorderColor(0.5, 0.5, 0.5, 0.8) end)
+        p.SetY(y0 - ROW_H - p.SEP)
+    end
+
     p.Finalize()
 end
 
@@ -2513,7 +2586,7 @@ local function PageAudio(parent, CW)
     p.Header("Wishlist Sound")
     local wlSndToggle = p.Row("Play sound when wishlisted item drops",
         function() return LLF.db.wishlistSoundEnabled end,
-        function(v) LLF.db.wishlistSoundEnabled = v; RefreshAll() end)
+        function(v) LLF.db.wishlistSoundEnabled = v; RefreshAll(); LLF.Feed:RefreshTestRows(true); LLF.PartyFeed:RefreshTestRows(true) end)
     local y1 = p.GetY()
     local lp2 = MakeListPicker(parent, "Sound choice:", 40,
         function() return LLF.db.wishlistSoundChoice or 1 end,
@@ -2969,21 +3042,26 @@ end
 local function PageWishlist(parent, CW)
     local p = MakePage(parent, CW)
     p.Header("Item Wishlist")
-    p.Label("|cffaaaaaaOnly wishlisted items appear in your feed. Gold, currency, rep, and honor are unaffected.|r")
+    p.Label("|cffaaaaaaWishlisted items can glow and play a sound. With hide enabled, non-wishlisted items are hidden. Gold, currency, rep, and honor are always shown.|r")
     p.Sep(6)
 
-    local wlToggle = p.RowL("Enable wishlist filter",
+    local wlToggle = p.RowL("Enable wishlist",
         function() return LLF.db.wishlistEnabled == true end,
-        function(v) LLF.db.wishlistEnabled = v; RefreshAll() end)
+        function(v) LLF.db.wishlistEnabled = v; RefreshAll(); LLF.Feed:ApplyTestFilters(); LLF.Feed:RefreshTestRows(true); LLF.PartyFeed:ApplyTestFilters(); LLF.PartyFeed:RefreshTestRows(true) end)
     local grpToggle = p.RowR("Also apply to group loot",
         function() return LLF.db.wishlistGroupLoot == true end,
         function(v) LLF.db.wishlistGroupLoot = v end)
+    local hideToggle = p.Row("Hide non-wishlisted items",
+        function() return LLF.db.wishlistHideOthers ~= false end,
+        function(v) LLF.db.wishlistHideOthers = v; RefreshAll(); LLF.Feed:ApplyTestFilters(); LLF.Feed:RefreshTestRows(); LLF.PartyFeed:ApplyTestFilters(); LLF.PartyFeed:RefreshTestRows() end)
 
     local listCont
     local function SyncGroupToggle()
         local enabled = LLF.db.wishlistEnabled
         grpToggle:EnableMouse(enabled)
         grpToggle:SetAlpha(enabled and 1 or 0.35)
+        hideToggle:EnableMouse(enabled)
+        hideToggle:SetAlpha(enabled and 1 or 0.35)
         if listCont then listCont:SetAlpha(enabled and 1 or 0.35) end
         if ApplyWlGlowGating then ApplyWlGlowGating() end
     end
@@ -3155,6 +3233,8 @@ local function PageWishlist(parent, CW)
             emptyFS:SetText("No items wishlisted.")
             emptyFS:Show()
             listContent:SetHeight(LIST_H - 6)
+            LLF.Feed:ApplyTestFilters(); LLF.Feed:RefreshTestRows(true)
+            LLF.PartyFeed:ApplyTestFilters(); LLF.PartyFeed:RefreshTestRows(true)
             return
         end
 
@@ -3171,6 +3251,8 @@ local function PageWishlist(parent, CW)
             emptyFS:SetText(lo ~= "" and ("No results for \"" .. searchStr .. "\".") or "No items wishlisted.")
             emptyFS:Show()
             listContent:SetHeight(LIST_H - 6)
+            LLF.Feed:ApplyTestFilters(); LLF.Feed:RefreshTestRows(true)
+            LLF.PartyFeed:ApplyTestFilters(); LLF.PartyFeed:RefreshTestRows(true)
             return
         end
 
@@ -3214,6 +3296,8 @@ local function PageWishlist(parent, CW)
         end
 
         listContent:SetHeight(math.max(math.abs(y), 1))
+        LLF.Feed:ApplyTestFilters(); LLF.Feed:RefreshTestRows(true)
+        LLF.PartyFeed:ApplyTestFilters(); LLF.PartyFeed:RefreshTestRows(true)
     end
 
     local ySearch = p.GetY()

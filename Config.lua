@@ -86,6 +86,8 @@ Config.DEFAULTS = {
     socketColorPerFeed    = false,
     appendColorPerFeed    = false,
     ownedColorPerFeed     = false,
+    keystoneColor        = { 0.267, 0.867, 1.0, 1.0 },
+    goldMinAmount        = 0,
     personalFilters = {
         filterRarity = {
             [0]=true,[1]=true,[2]=true,[3]=true,
@@ -110,6 +112,7 @@ Config.DEFAULTS = {
     blacklist   = {},
     wishlist    = {},
     wishlistEnabled   = false,
+    wishlistHideOthers = true,
     wishlistGroupLoot = false,
     showMinimap = true,
     minimapIcon = {},

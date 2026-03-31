@@ -353,6 +353,8 @@ local function HandleMoney()
     lastMoney = current
     if delta <= 0 then return end
     if LLF.db and LLF.db.showGold == false then return end
+    local minGold = LLF.db and (LLF.db.goldMinAmount or 0) or 0
+    if minGold > 0 and delta < minGold * 10000 then return end
     if LLF.Config:GetDuration("gold") <= 0 then return end
     local icon = delta >= 10000 and 133784 or delta >= 100 and 133786 or 133788
     LLF.Feed:AddEntry({ icon=icon, name="Money", rarity=1, source=1, count=1, price=delta, mergeKey="money" })
@@ -385,6 +387,92 @@ local function GetGroupMemberClass(name)
         end
     end
     return nil
+end
+
+local MYTHIC_KEYSTONE_ID = 180653
+
+local function ParseKeystoneLink(link)
+    if not link then return nil, nil end
+    local mapID, lvl = link:match("|Hkeystone:%d+:(%d+):(%d+)")
+    if mapID then return tonumber(lvl), tonumber(mapID) end
+    local raw = string.match(link, "|Hitem:180653:([^|]+)")
+             or string.match(link, "item:180653:([^|%s]+)")
+    if not raw then return nil, nil end
+    local iid  = tonumber(raw:match(":17:(%d+)"))
+    local klvl = tonumber(raw:match(":18:(%d+)"))
+    return klvl, iid
+end
+
+local function AugmentKeystoneEntry(entry)
+    if not entry then return end
+    local itemID = entry.link and (
+        tonumber(string.match(entry.link, "item:(%d+)")) or
+        tonumber(string.match(entry.link, "|Hkeystone:(%d+)"))
+    )
+    if itemID ~= MYTHIC_KEYSTONE_ID then return end
+    local level, mapID = ParseKeystoneLink(entry.link)
+    if not level then
+        level = C_MythicPlus and C_MythicPlus.GetOwnedKeystoneLevel and C_MythicPlus.GetOwnedKeystoneLevel()
+    end
+    if not mapID then
+        mapID = C_MythicPlus and C_MythicPlus.GetOwnedKeystoneChallengeMapID and C_MythicPlus.GetOwnedKeystoneChallengeMapID()
+    end
+    local dungeonName
+    if mapID and C_ChallengeMode and C_ChallengeMode.GetMapUIInfo then
+        dungeonName = C_ChallengeMode.GetMapUIInfo(mapID)
+    end
+    if level then
+        entry.name = "Mythic Keystone +" .. level
+    end
+    entry.itemCategory = "keystone"
+    entry.canAH    = false
+    entry.subType  = dungeonName or "Keystone"
+    entry.mergeKey = "item:" .. MYTHIC_KEYSTONE_ID
+end
+
+local _postRunKeystoneShown  = false
+local _keystonePendingCheck  = false
+local _preRunKeystoneLevel   = nil
+local _preRunKeystoneMapID   = nil
+local eventFrame
+
+local function KeystoneEntryFromBag()
+    if not (C_Container and C_Container.GetContainerNumSlots) then return nil end
+    local keystoneLink
+    for bag = 0, 4 do
+        for slot = 1, C_Container.GetContainerNumSlots(bag) do
+            if C_Container.GetContainerItemID(bag, slot) == MYTHIC_KEYSTONE_ID then
+                keystoneLink = C_Container.GetContainerItemLink(bag, slot)
+                break
+            end
+        end
+        if keystoneLink then break end
+    end
+    if not keystoneLink then return nil end
+    local _, itemLink = C_Item.GetItemInfo(MYTHIC_KEYSTONE_ID)
+    if not itemLink then return nil end
+    local entry = EntryFromLink(itemLink, 1, 3)
+    if not entry then return nil end
+    entry.link = keystoneLink
+    return entry
+end
+
+local function HandlePostRunKeystone()
+    _keystonePendingCheck = false
+    eventFrame:UnregisterEvent("ITEM_PUSH")
+    eventFrame:UnregisterEvent("ITEM_CHANGED")
+    eventFrame:UnregisterEvent("PLAYER_LEAVING_WORLD")
+    if _postRunKeystoneShown then return end
+    local newLevel = C_MythicPlus and C_MythicPlus.GetOwnedKeystoneLevel and C_MythicPlus.GetOwnedKeystoneLevel()
+    local newMapID = C_MythicPlus and C_MythicPlus.GetOwnedKeystoneChallengeMapID and C_MythicPlus.GetOwnedKeystoneChallengeMapID()
+    if newLevel == _preRunKeystoneLevel and newMapID == _preRunKeystoneMapID then return end
+    local entry = KeystoneEntryFromBag()
+    if not entry then return end
+    _postRunKeystoneShown = true
+    AugmentKeystoneEntry(entry)
+    if not ShouldFilterCategory(entry.itemCategory, false) then
+        LLF.Feed:AddEntry(entry)
+    end
 end
 
 local function HandleChatMsgLoot(msg, _, _, _, sender)
@@ -442,7 +530,21 @@ local function HandleChatMsgLoot(msg, _, _, _, sender)
         end
     end
     local entry = EntryFromLink(link, tonumber(string.match(msg, "x(%d+)%s*$")) or 1, 4)
-    if entry and not ShouldFilterCategory(entry.itemCategory, false) then LLF.Feed:AddEntry(entry) end
+    if entry then
+        AugmentKeystoneEntry(entry)
+        if entry.itemCategory == "keystone" then
+            _postRunKeystoneShown = true
+            C_Timer.After(1, function()
+                local target = KeystoneEntryFromBag() or entry
+                AugmentKeystoneEntry(target)
+                if not ShouldFilterCategory(target.itemCategory, false) then
+                    LLF.Feed:AddEntry(target)
+                end
+            end)
+        elseif not ShouldFilterCategory(entry.itemCategory, false) then
+            LLF.Feed:AddEntry(entry)
+        end
+    end
 end
 
 local function HandleEncounterLoot(_, _, link, count, playerName)
@@ -464,6 +566,7 @@ local function HandleCurrency(msg)
     msg = SafeString(msg)
     if msg == "" then return end
     local cLink = string.match(msg, "(|c%x%x%x%x%x%x%x%x|Hcurrency:%d+|h%[.-%]|h|r)")
+                   or string.match(msg, "(|Hcurrency:%d+|h%[.-%]|h)")
     if not cLink then return end
     local info = C_CurrencyInfo.GetCurrencyInfoFromLink(cLink)
     if not info then return end
@@ -571,19 +674,33 @@ local function IsSuppressibleDefaultAlert(frame)
         if name:find("LootWonAlertFrame", 1, true) then return true end
     end
     if frame.money and frame.gold and frame.silver and frame.copper then return true end
+    if frame.Amount then return true end
     return false
 end
 
 local function HideActiveLootAlerts()
-    if not AlertFrame then return end
-    local n = AlertFrame:GetNumChildren()
-    for i = 1, n do
-        local child = select(i, AlertFrame:GetChildren())
-        if IsSuppressibleDefaultAlert(child) then
-            if AlertFrame.RemoveAlertFrame then
-                AlertFrame:RemoveAlertFrame(child)
+    if AlertFrame then
+        local n = AlertFrame:GetNumChildren()
+        for i = 1, n do
+            local child = select(i, AlertFrame:GetChildren())
+            if IsSuppressibleDefaultAlert(child) then
+                if AlertFrame.RemoveAlertFrame then
+                    AlertFrame:RemoveAlertFrame(child)
+                end
+                child:Hide()
             end
-            child:Hide()
+        end
+    end
+    if UIParent then
+        local un = UIParent:GetNumChildren()
+        for i = 1, un do
+            local child = select(i, UIParent:GetChildren())
+            if child then
+                local ok, shown = pcall(function() return child:IsShown() end)
+                if ok and shown and IsSuppressibleDefaultAlert(child) then
+                    child:Hide()
+                end
+            end
         end
     end
 end
@@ -652,7 +769,7 @@ local function SetupTransmogSuppression()
     end)
 end
 
-local eventFrame = CreateFrame("Frame", "LarlenLootFrameEventFrame")
+eventFrame = CreateFrame("Frame", "LarlenLootFrameEventFrame")
 eventFrame:RegisterEvent("ADDON_LOADED")
 eventFrame:RegisterEvent("PLAYER_LOGIN")
 
@@ -685,6 +802,7 @@ eventFrame:SetScript("OnEvent", function(_, event, ...)
         eventFrame:RegisterEvent("CHAT_MSG_CURRENCY")
         eventFrame:RegisterEvent("QUEST_LOOT_RECEIVED")
         eventFrame:RegisterEvent("CHAT_MSG_COMBAT_HONOR_GAIN")
+        eventFrame:RegisterEvent("CHALLENGE_MODE_COMPLETED")
         if LLF.db.personalFilters and LLF.db.personalFilters.filterRep then
             eventFrame:RegisterEvent("CHAT_MSG_COMBAT_FACTION_CHANGE")
         end
@@ -696,6 +814,7 @@ eventFrame:SetScript("OnEvent", function(_, event, ...)
         LLF.Minimap:ApplyVisibility()
         SetupLootSuppressionFrameHooks()
         SetupTransmogSuppression()
+        lastMoney = GetMoney()
 
     elseif event == "PLAYER_MONEY" then
         HandleMoney()
@@ -732,6 +851,30 @@ eventFrame:SetScript("OnEvent", function(_, event, ...)
         local msg = ...
         msg = SafeString(msg)
         C_Timer.After(0, function() HandleHonor(msg) end)
+
+    elseif event == "CHALLENGE_MODE_COMPLETED" then
+        _postRunKeystoneShown = false
+        _keystonePendingCheck = false
+        _preRunKeystoneLevel = C_MythicPlus and C_MythicPlus.GetOwnedKeystoneLevel and C_MythicPlus.GetOwnedKeystoneLevel()
+        _preRunKeystoneMapID = C_MythicPlus and C_MythicPlus.GetOwnedKeystoneChallengeMapID and C_MythicPlus.GetOwnedKeystoneChallengeMapID()
+        eventFrame:RegisterEvent("ITEM_PUSH")
+        eventFrame:RegisterEvent("ITEM_CHANGED")
+        eventFrame:RegisterEvent("PLAYER_LEAVING_WORLD")
+
+    elseif event == "PLAYER_LEAVING_WORLD" then
+        eventFrame:UnregisterEvent("ITEM_PUSH")
+        eventFrame:UnregisterEvent("ITEM_CHANGED")
+        eventFrame:UnregisterEvent("PLAYER_LEAVING_WORLD")
+
+    elseif event == "ITEM_PUSH" or event == "ITEM_CHANGED" then
+        if _postRunKeystoneShown then
+            eventFrame:UnregisterEvent("ITEM_PUSH")
+            eventFrame:UnregisterEvent("ITEM_CHANGED")
+            eventFrame:UnregisterEvent("PLAYER_LEAVING_WORLD")
+        elseif not _keystonePendingCheck then
+            _keystonePendingCheck = true
+            C_Timer.After(1, HandlePostRunKeystone)
+        end
     end
 end)
 

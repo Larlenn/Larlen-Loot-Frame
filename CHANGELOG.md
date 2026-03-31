@@ -1,5 +1,20 @@
 # Larlen Loot Frame Changelog
 
+## v1.3.0
+- Added keystone tracking - keystones looted or changed after a Mythic+ now show in the feed with dungeon name and level
+- Fixed gold not showing when Poor (grey) rarity was toggled off in filters
+- Fixed gold still triggering the default Blizzard popup when loot suppression was enabled
+- Fixed gold amount formatting for gold drops
+- Fixed gold not showing in test rows
+- Reworked wishlist: added a toggle to hide non-wishlisted items separately, so glow/audio alerts can still be used for specific items without hiding everything else
+- Fixed wishlist glow still showing in test rows when wishlist was disabled
+- Fixed wishlist audio still playing from test rows when wishlist was disabled
+- Fixed test rows not respecting wishlist state correctly
+- Fixed a crash in loot suppression that could occur after a Mythic+ dungeon ended
+- Added minimum gold threshold filter - set a gold amount in the Filters page; gains below it are hidden. Slider collapses when gold display is turned off
+- Fixed currencies not appearing in the feed when the chat message contained an uncoloured currency link
+- Updated and reformatted the README
+
 ## v1.2.1
 - Fixed G and W buttons showing incorrectly at certain feed scale values
 
